@@ -1,0 +1,72 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { chatsApi } from './api'
+
+/**
+ * GET /conversations, with the four states a real network actually has:
+ * loading, loaded, empty and failed — plus an explicit `retry`.
+ *
+ * `conversations` is null until the first response, so a component can tell
+ * "not loaded yet" from "loaded and empty" and show a skeleton rather than an
+ * empty-state panel that flashes on every mount.
+ */
+export function useConversations() {
+  const [conversations, setConversations] = useState(null)
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const alive = useRef(true)
+
+  /**
+   * Set to true on every run, not just at declaration.
+   *
+   * React StrictMode mounts, unmounts and remounts each component once in
+   * development. A cleanup-only effect flips this to false during that
+   * simulated unmount and never restores it, because re-running the effect only
+   * registers a new cleanup. From then on every `if (!alive.current) return`
+   * guard fires, `setLoading(false)` never runs, and the screen sits on its
+   * loading skeleton forever while the responses arrive and are discarded.
+   */
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await chatsApi.list()
+      if (!alive.current) return
+      setConversations(data?.conversations ?? [])
+    } catch (err) {
+      if (!alive.current) return
+      setError(err)
+    } finally {
+      if (alive.current) setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  /** Move a conversation to the top after a new message, without a refetch. */
+  const bump = useCallback((conversationId, lastMessage) => {
+    setConversations((prev) => {
+      if (!prev) return prev
+      const index = prev.findIndex((c) => c.id === conversationId)
+      if (index === -1) return prev
+      const next = [...prev]
+      const [item] = next.splice(index, 1)
+      next.unshift({
+        ...item,
+        lastMessage,
+        updatedAt: lastMessage?.createdAt ?? Date.now(),
+      })
+      return next
+    })
+  }, [])
+
+  return { conversations, loading, error, retry: load, bump }
+}

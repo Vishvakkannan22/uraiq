@@ -1,0 +1,152 @@
+/* ============================================================
+   UraiQ — Design Tokens · brand violet
+   A light theme built on the logo's violet→blue, violet-biased
+   neutrals and a real three-step elevation scale. Surfaces are solid white with a
+   hairline edge; depth comes from layered shadow, not from tinting
+   the surface. The gradient is rationed — primary CTA, outgoing
+   bubble, send button, active accents. Nothing else.
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- Brand ramp: violet → blue, taken from the logo ------ */
+  --brand-50:  #FAF5FF;
+  --brand-100: #F3E8FF;
+  --brand-200: #E9D5FF;
+  --brand-300: #D8B4FE;
+  --brand-400: #C084FC;
+  --brand-500: #A855F7;
+  --brand-600: #9333EA;
+  --brand-700: #7E22CE;
+  --brand-800: #6B21A8;
+  --accent-500: #6366F1;
+  --accent-600: #4F46E5;
+
+  --grad: linear-gradient(135deg, #E9B6FF 0%, #A855F7 46%, #6D28D9 100%);
+  /* Vertical, for the wordmark's U and Q — light crown, deep foot. */
+  --grad-mark: linear-gradient(180deg, #EFC9FF 0%, #A855F7 52%, #6D28D9 100%);
+  --grad-vivid: linear-gradient(135deg, #D946EF 0%, #9333EA 50%, #2563EB 100%);
+  --grad-wash: linear-gradient(135deg, rgba(232,121,249,.18), rgba(168,85,247,.12) 55%, rgba(59,130,246,.10));
+
+  /* ---- Neutrals (violet-biased, never pure grey) ---------- */
+  --n-0:   #FFFFFF;
+  --n-25:  #FDFCFE;
+  --n-50:  #F9F7FC;
+  --n-100: #F4F1F9;
+  --n-150: #EDE9F4;
+  --n-200: #E4DFEE;
+  --n-300: #D0C9E0;
+  --n-400: #A9A0C0;
+  --n-500: #8B82A4;
+  --n-600: #6B5F98;
+  --n-700: #4C3D82;
+  --n-800: #33246B;
+  --n-900: #1E1157;   /* the wordmark ink */
+
+  /* ---- Text ----------------------------------------------- */
+  --text: var(--n-900);
+  --text-2: var(--n-800);
+  --text-3: var(--n-700);
+  --text-4: var(--n-600);   /* #6C6389 — clears AA on --bg */
+  --text-on-brand: #FFFFFF;
+
+  /* ---- Status --------------------------------------------- */
+  --success: #059669;
+  --success-bg: #ECFDF5;
+  --danger: #E11D48;
+  --danger-bg: #FFF1F2;
+  --warning: #D97706;
+  /* Deliberately green, never the brand violet — an online dot that
+     reads as "brand colour" tells you nothing. */
+  --online: #22C55E;
+
+  --ring: 0 0 0 3px rgba(168, 85, 247, 0.32);
+
+  /* ---- Type ----------------------------------------------- */
+  --fs-11: 0.6875rem; --fs-12: 0.75rem;  --fs-13: 0.8125rem;
+  --fs-14: 0.875rem;  --fs-15: 0.9375rem; --fs-17: 1.0625rem;
+  --fs-20: 1.25rem;   --fs-24: 1.5rem;   --fs-30: 1.875rem;
+  --fs-36: 2.25rem;
+
+  --font-ui: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-brand: 'Fredoka', 'Inter Variable', -apple-system, sans-serif;
+
+  /* ---- Space (4pt grid) ----------------------------------- */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 20px; --s6: 24px; --s7: 32px; --s8: 40px;
+  --s9: 48px; --s10: 64px;
+
+  /* ---- Radius --------------------------------------------- */
+  --r-xs: 6px;  --r-sm: 10px; --r-md: 14px;
+  --r-lg: 18px; --r-xl: 24px; --r-2xl: 30px;
+  --r-full: 999px;
+
+  /* ---- Motion ---------------------------------------------
+     --ease is the house curve (fast out, long settle). Durations
+     stay short; the spring tokens in lib/motion.js carry anything
+     that should feel physical rather than timed. */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-1: 130ms; --dur-2: 220ms; --dur-3: 340ms;
+
+  /* ---- Layout --------------------------------------------- */
+  --rail-w: 76px;
+  --list-w: 348px;
+  --header-h: 60px;
+  --header-h-condensed: 48px;
+  --tabbar-h: 60px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* Alignment invariant: content starts --gutter from the pane edge.
+     Rows carry --row-pad so their hover background bleeds past the
+     text, so their scroller is inset by the difference, not --gutter. */
+  --gutter: 16px;
+  --row-pad: 12px;
+  --list-inset: calc(var(--gutter) - var(--row-pad)); /* 4px */
+  --bento-gap: 14px;
+
+  /* Ascending paint order. The scrim must sit *below* the sheet it dims. */
+  --z-header: 20;
+  --z-tabbar: 30;
+  --z-popover: 60;
+  --z-scrim: 80;
+  --z-sheet: 90;
+  --z-overlay: 100; /* full-screen takeovers, e.g. the story viewer */
+
+  /* ---- Surfaces ------------------------------------------- */
+  --bg: #F7F5FC;
+  --pane: #FFFFFF;
+
+  --surface: #FFFFFF;
+  --surface-2: #FDFCFE;
+  --surface-solid: #FFFFFF;
+
+  /* Chrome stays translucent — content scrolls under it and should
+     read as a layer above, not a seam. */
+  --chrome-bg: rgba(255, 255, 255, 0.82);
+  --chrome-blur: blur(18px) saturate(180%);
+
+  --border: rgba(27, 20, 48, 0.07);
+  --border-strong: rgba(27, 20, 48, 0.13);
+  --divider: rgba(27, 20, 48, 0.07);
+
+  /* Three real steps, each roughly tripling blur. e1 seats a thing on
+     the page, e2 lifts it, e3 floats it, e4 is for takeovers only. */
+  --e1: 0 1px 2px rgba(27, 20, 48, 0.05);
+  --e2: 0 4px 12px rgba(27, 20, 48, 0.07), 0 1px 2px rgba(27, 20, 48, 0.04);
+  --e3: 0 12px 28px rgba(27, 20, 48, 0.10), 0 2px 6px rgba(27, 20, 48, 0.05);
+  --e4: 0 24px 56px rgba(27, 20, 48, 0.16), 0 4px 12px rgba(27, 20, 48, 0.06);
+  --e-inset: inset 0 0 0 1px rgba(27, 20, 48, 0.06);
+
+  --e-brand: 0 6px 18px rgba(147, 51, 234, 0.30);
+  --e-brand-lg: 0 10px 28px rgba(147, 51, 234, 0.38);
+
+  --track: #F0ECF8;
+  --hover: rgba(27, 20, 48, 0.04);
+  --pressed: rgba(27, 20, 48, 0.07);
+
+}
+
+@media (max-width: 1120px) { :root { --list-w: 302px; } }

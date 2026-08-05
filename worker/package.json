@@ -1,0 +1,22 @@
+{
+  "name": "uraiq-worker",
+  "private": true,
+  "version": "1.0.0",
+  "description": "UraiQ messaging API — Cloudflare Workers, D1, KV, Durable Objects",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:raw": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types",
+    "db:local": "wrangler d1 migrations apply uraiq --local",
+    "db:remote": "wrangler d1 migrations apply uraiq --remote",
+    "db:query": "wrangler d1 execute uraiq --local --command",
+    "tail": "wrangler tail --format pretty"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260804.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.119.0"
+  }
+}

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="UraiQ">
+  <defs>
+    <linearGradient id="uqMark" x1="18" y1="10" x2="104" y2="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E9B6FF"/>
+      <stop offset="0.42" stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#6D28D9"/>
+    </linearGradient>
+    <linearGradient id="uqWave" x1="88" y1="34" x2="120" y2="94" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+    <filter id="uqGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feColorMatrix in="b" type="matrix"
+        values="0 0 0 0 0.66  0 0 0 0 0.33  0 0 0 0 0.97  0 0 0 .55 0"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- The U: open at the top, deep rounded bowl. -->
+  <path d="M14 22v32a20 20 0 0 0 40 0V22"
+        fill="none" stroke="url(#uqMark)" stroke-width="12" stroke-linecap="round"
+        filter="url(#uqGlow)"/>
+
+  <!-- Speech bubble, tail dropping to the lower left. -->
+  <path d="M84 20a28 28 0 0 1 0 56H70L54 90l4-15a28 28 0 0 1 26-55Z"
+        fill="none" stroke="url(#uqMark)" stroke-width="9" stroke-linejoin="round"
+        filter="url(#uqGlow)"/>
+
+  <!-- Voice waveform inside the bubble. -->
+  <path d="M72 40v16M84 33v30M96 41v14"
+        stroke="url(#uqMark)" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Sound radiating out to the right. -->
+  <path d="M108 38a30 30 0 0 1 0 44" fill="none" stroke="url(#uqWave)" stroke-width="7" stroke-linecap="round"/>
+  <path d="M118 26a46 46 0 0 1 0 68" fill="none" stroke="url(#uqWave)" stroke-width="6" stroke-linecap="round" opacity=".65"/>
+</svg>

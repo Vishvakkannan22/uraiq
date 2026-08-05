@@ -1,0 +1,86 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "uraiq-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-15",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Workers Logs. Without this, `wrangler tail` is the only way to see a
+  // production error and nothing is retained after you disconnect.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+
+  // -------------------------------------------------------------------------
+  // Before the first deploy, replace each placeholder id with the value printed
+  // by the corresponding create command. `npm run setup` prints both commands.
+  //   npx wrangler d1 create uraiq
+  //   npx wrangler kv namespace create KV
+  // Local `wrangler dev` simulates D1, KV and Durable Objects and ignores these
+  // ids entirely, so development works before any of this is filled in.
+  // -------------------------------------------------------------------------
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "uraiq",
+      "database_id": "TODO_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "TODO_KV_NAMESPACE_ID"
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CONVERSATION",
+        "class_name": "ConversationRoom"
+      }
+    ]
+  },
+
+  // SQLite-backed Durable Objects are required for the WebSocket Hibernation
+  // API. Without `new_sqlite_classes` the class is created on the legacy
+  // key-value backend, where `acceptWebSocket` is unavailable and an idle room
+  // bills for wall-clock duration instead of nothing.
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ConversationRoom"]
+    }
+  ],
+
+  // Workers AI needs no provisioning — no id, no create command. The moderation
+  // agent degrades to its rule net if this binding is ever absent.
+  "ai": {
+    "binding": "AI"
+  },
+
+  "vars": {
+    // Comma-separated exact origins. No wildcard: the API takes an
+    // Authorization header, and browsers reject `*` on a credentialed request.
+    //
+    // Vite walks forward a port at a time when 5173 is taken, and an origin
+    // that is not listed here fails its CORS preflight — which the browser
+    // reports to JS as an indistinguishable network error, not as CORS. So the
+    // next few ports are listed too; they are all loopback, reachable only from
+    // the developer's own machine.
+    //
+    // REPLACE this whole value with your real front-end origin before deploying.
+    "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175",
+    "ACCESS_TTL_SECONDS": "900",
+    "REFRESH_TTL_SECONDS": "2592000",
+    "LOG_LEVEL": "info"
+  }
+
+  // Secrets — set with `npx wrangler secret put <NAME>`, never in this file.
+  // Locally they come from .dev.vars, which is gitignored.
+  //   JWT_SECRET   HMAC key for access tokens (32+ random bytes)
+}

@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.wrangler/
+
+# Local environment. .env.example is the committed template.
+.env
+.env.local
+.env.*.local
+
+# Worker secrets — never commit.
+worker/.dev.vars
+
+*.log
+vite-out.txt
+vite-err.txt
+.DS_Store
+
+# Product documents. Binaries bloat git history and cannot be diffed or
+# reviewed; keep them wherever the rest of the company's docs live.
+*.pdf
+*.docx
