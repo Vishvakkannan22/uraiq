@@ -10,6 +10,9 @@ export interface ConversationListRow {
   unread_count: number
   archived: number
   muted_until: number | null
+  /* NULL means nothing cleared. Otherwise, any message id at or before this
+     one is hidden from *this* member's view — never the peer's. */
+  cleared_before_id: string | null
   peer_id: string
 }
 
@@ -26,7 +29,7 @@ export function listForUser(db: Db, userId: string) {
     db
       .prepare(
         `SELECT c.id, c.last_message_id, c.last_message_at, c.updated_at,
-                m.unread_count, m.archived, m.muted_until,
+                m.unread_count, m.archived, m.muted_until, m.cleared_before_id,
                 peer.user_id AS peer_id
            FROM conversation_members m
            JOIN conversations c ON c.id = m.conversation_id
@@ -54,6 +57,7 @@ export interface MemberViewRow {
   unread_count: number
   archived: number
   muted_until: number | null
+  cleared_before_id: string | null
 }
 
 export function findForMember(db: Db, conversationId: string, userId: string) {
@@ -62,13 +66,50 @@ export function findForMember(db: Db, conversationId: string, userId: string) {
     db
       .prepare(
         `SELECT c.last_message_id, c.last_message_at, c.updated_at,
-                m.unread_count, m.archived, m.muted_until
+                m.unread_count, m.archived, m.muted_until, m.cleared_before_id
            FROM conversations c
            JOIN conversation_members m
                 ON m.conversation_id = c.id AND m.user_id = ?2
           WHERE c.id = ?1`
       )
       .bind(conversationId, userId)
+  )
+}
+
+/** Just this member's clear cursor — what message listing filters against. */
+export function getClearedCursor(db: Db, conversationId: string, userId: string) {
+  return db.first<{ cleared_before_id: string | null }>(
+    'conversations.getClearedCursor',
+    db
+      .prepare(
+        'SELECT cleared_before_id FROM conversation_members WHERE conversation_id = ?1 AND user_id = ?2'
+      )
+      .bind(conversationId, userId)
+  )
+}
+
+/**
+ * Clear chat: move this member's cursor to `uptoMessageId` (the conversation's
+ * current last message) and zero their unread counter, since nothing is left
+ * to be unread once it is all hidden.
+ *
+ * `uptoMessageId` may be null for a conversation with no messages yet — the
+ * cursor stays null and the call is a harmless no-op.
+ */
+export function setClearedCursor(
+  db: Db,
+  conversationId: string,
+  userId: string,
+  uptoMessageId: string | null
+) {
+  return db.run(
+    'conversations.setClearedCursor',
+    db
+      .prepare(
+        `UPDATE conversation_members SET cleared_before_id = ?1, unread_count = 0
+          WHERE conversation_id = ?2 AND user_id = ?3`
+      )
+      .bind(uptoMessageId, conversationId, userId)
   )
 }
 

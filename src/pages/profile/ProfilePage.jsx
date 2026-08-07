@@ -1,36 +1,65 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Bell, Bookmark, QrCode, Settings, Share2 } from 'lucide-react'
+import { Bell, MessagesSquare, QrCode, Settings, Share2 } from 'lucide-react'
 import Header from '../../layout/Header'
 import Avatar from '../../components/ui/Avatar'
-import Segmented from '../../components/ui/Segmented'
 import SettingsSheet from './SettingsSheet'
-import { bentoItem, bentoStagger, listItem, listStagger } from '../../lib/motion'
 import { useIsDesktop } from '../../lib/useMediaQuery'
 import { useScrolled } from '../../lib/useScrolled'
-import { collections, currentUser, profilePosts } from '../../data/mockData'
+import { useMe } from '../../lib/useMe'
+import { setUser } from '../../lib/auth'
+import { usersApi } from '../../lib/api'
+import { useChatList } from '../../lib/chat/useChatList'
 
 export default function ProfilePage() {
   const isDesktop = useIsDesktop()
-  const [tab, setTab] = useState('posts')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsPanel, setSettingsPanel] = useState('root')
-  const [user, setUser] = useState(currentUser)
   const scrollRef = useRef(null)
   const scrolled = useScrolled(scrollRef)
 
-  const patchUser = (patch) => setUser((u) => ({ ...u, ...patch }))
+  const me = useMe()
+  /* The only real, honest metric this milestone has about a person: how many
+     conversations they're in. Posts/followers/following belonged to the
+     feed prototype and had no backend behind them — showing invented numbers
+     on a real signed-in profile is exactly the kind of thing this page used
+     to do that made it read as a demo rather than a product. */
+  const { chats } = useChatList()
 
   function openSettings(panel) {
     setSettingsPanel(panel)
     setSettingsOpen(true)
   }
 
+  /**
+   * Persists via PATCH /users/me, then writes the response into the shared
+   * session cache. That one `setUser` call is what makes the new name and
+   * avatar appear immediately in the tab bar, the nav rail and this page —
+   * they all read from the same cache through `useMe()`/`useAuth()`.
+   *
+   * A conversation someone else has open with this account picks up the
+   * change the next time they open or reload it — the peer's profile is read
+   * fresh from the database on every such request, never cached past that.
+   */
+  async function handleSaveProfile(patch) {
+    const { user: updated } = await usersApi.update(patch)
+    setUser(updated)
+  }
+
+  if (!me) {
+    return (
+      <div className="col grow" style={{ minWidth: 0, minHeight: 0 }}>
+        <Header title="Profile" scrolled={scrolled} />
+        <div className="scroll grow" style={{ padding: '0 var(--gutter)' }} />
+      </div>
+    )
+  }
+
   return (
     <div className="col grow" style={{ minWidth: 0, minHeight: 0 }}>
       <Header
-        title={user.handle}
+        title={me.handle}
         scrolled={scrolled}
         actions={
           <>
@@ -48,35 +77,22 @@ export default function ProfilePage() {
           transition={{ duration: 0.4 }}
           style={{ maxWidth: 680 }}
         >
-          {/* Identity and metrics separated: the name/bio is one block, the
-              numbers are their own boxes, so neither competes for the same row. */}
           <div className="row" style={{ gap: 'var(--s4)', padding: 'var(--s5) 0' }}>
-            <Avatar initials={user.initials} gradient={user.gradient} size={72} ring="unseen" />
+            <Avatar gradient={me.avatarGradient} size={72} ring="unseen" />
             <div className="grow" style={{ minWidth: 0 }}>
               <div className="truncate" style={{ fontWeight: 680, fontSize: 'var(--fs-20)', color: 'var(--text)', letterSpacing: '-0.022em' }}>
-                {user.name}
+                {me.displayName}
               </div>
-              <p style={{ fontSize: 'var(--fs-14)', color: 'var(--text-3)', marginTop: 4 }}>{user.bio}</p>
+              {me.bio && (
+                <p style={{ fontSize: 'var(--fs-14)', color: 'var(--text-3)', marginTop: 4 }}>{me.bio}</p>
+              )}
             </div>
           </div>
 
-          <motion.div
-            variants={bentoStagger}
-            initial="hidden"
-            animate="show"
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--s2)' }}
-          >
-            {[
-              ['Posts', user.stats.posts],
-              ['Followers', user.stats.followers.toLocaleString()],
-              ['Following', user.stats.following],
-            ].map(([label, value]) => (
-              <motion.div key={label} variants={bentoItem} className="stat-tile">
-                <span className="stat-tile__value tnum">{value}</span>
-                <span className="stat-tile__label">{label}</span>
-              </motion.div>
-            ))}
-          </motion.div>
+          <div className="stat-tile" style={{ maxWidth: 200 }}>
+            <span className="stat-tile__value tnum">{chats.length}</span>
+            <span className="stat-tile__label">Conversations</span>
+          </div>
 
           <div className="row" style={{ gap: 'var(--s2)', margin: 'var(--s5) 0' }}>
             <button className="btn btn--secondary btn--sm grow" onClick={() => openSettings('edit')}>Edit profile</button>
@@ -85,51 +101,18 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          <div className="row" style={{ justifyContent: 'center', paddingBottom: 'var(--s4)' }}>
-            <Segmented
-              id="profile"
-              value={tab}
-              onChange={setTab}
-              items={[{ value: 'posts', label: 'Posts' }, { value: 'saved', label: 'Saved' }]}
-            />
+          <div
+            className="col"
+            style={{
+              alignItems: 'center', gap: 'var(--s2)', padding: 'var(--s8) var(--s5)',
+              color: 'var(--text-4)', textAlign: 'center',
+            }}
+          >
+            <MessagesSquare size={28} strokeWidth={1.6} />
+            <p style={{ fontSize: 'var(--fs-13)', maxWidth: 260 }}>
+              Your posts and saved items will show up here once that part of UraiQ is live.
+            </p>
           </div>
-
-          {tab === 'posts' ? (
-            <motion.div
-              key="posts"
-              variants={listStagger}
-              initial="hidden"
-              animate="show"
-              style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--s1)' }}
-            >
-              {profilePosts.map((g, i) => (
-                <motion.div
-                  key={i}
-                  variants={listItem}
-                  whileHover={{ scale: 0.985 }}
-                  style={{ aspectRatio: '1 / 1', background: g, borderRadius: 'var(--r-sm)', cursor: 'pointer' }}
-                />
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="saved"
-              variants={bentoStagger}
-              initial="hidden"
-              animate="show"
-              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 'var(--s3)' }}
-            >
-              {collections.map((c) => (
-                <motion.button key={c.id} variants={bentoItem} whileHover={{ y: -3 }} className="collection-card">
-                  <span className="collection-card__cover" style={{ background: c.gradient }}>
-                    <Bookmark size={18} />
-                  </span>
-                  <span className="collection-card__name truncate">{c.name}</span>
-                  <span className="collection-card__count tnum">{c.count} saved</span>
-                </motion.button>
-              ))}
-            </motion.div>
-          )}
         </motion.div>
       </div>
 
@@ -138,8 +121,8 @@ export default function ProfilePage() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         desktop={isDesktop}
-        user={user}
-        onUser={patchUser}
+        user={me}
+        onSaveProfile={handleSaveProfile}
         initialPanel={settingsPanel}
       />
     </div>

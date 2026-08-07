@@ -8,25 +8,35 @@ import { placeholders } from './client'
  * `WHERE id < ?cursor ORDER BY id DESC` walks one index in both directions, so
  * page 500 costs the same as page 1. An OFFSET query would re-scan every
  * skipped row and get slower as a conversation grows.
+ *
+ * `clearedBefore` is the viewer's own "clear chat" boundary, not a pagination
+ * cursor: it excludes messages at or before the point they cleared, so a
+ * cleared history stays hidden from them specifically no matter how far back
+ * they page — while the other participant's query has no such bound and sees
+ * everything, because the same rows are never touched for their side.
  */
-export function listPage(db: Db, conversationId: string, limit: number, before: string | null) {
-  const statement = before
-    ? db
-        .prepare(
-          `SELECT * FROM messages
-            WHERE conversation_id = ?1 AND id < ?2
-            ORDER BY id DESC LIMIT ?3`
-        )
-        .bind(conversationId, before, limit)
-    : db
-        .prepare(
-          `SELECT * FROM messages
-            WHERE conversation_id = ?1
-            ORDER BY id DESC LIMIT ?2`
-        )
-        .bind(conversationId, limit)
+export function listPage(
+  db: Db,
+  conversationId: string,
+  limit: number,
+  before: string | null,
+  clearedBefore: string | null
+) {
+  const conditions = ['conversation_id = ?1']
+  const binds: unknown[] = [conversationId]
 
-  return db.all<MessageRow>('messages.listPage', statement)
+  if (before) {
+    binds.push(before)
+    conditions.push(`id < ?${binds.length}`)
+  }
+  if (clearedBefore) {
+    binds.push(clearedBefore)
+    conditions.push(`id > ?${binds.length}`)
+  }
+  binds.push(limit)
+
+  const sql = `SELECT * FROM messages WHERE ${conditions.join(' AND ')} ORDER BY id DESC LIMIT ?${binds.length}`
+  return db.all<MessageRow>('messages.listPage', db.prepare(sql).bind(...binds))
 }
 
 export function findById(db: Db, messageId: string) {

@@ -52,6 +52,7 @@ export const chatsApi = {
   edit: (id, messageId, body) => patch(endpoints.message(id, messageId), { body }),
   remove: (id, messageId) => del(endpoints.message(id, messageId)),
   markRead: (id, lastReadMessageId) => post(endpoints.markRead(id), { lastReadMessageId }),
+  clearChat: (id) => post(endpoints.clearChat(id)),
 }
 
 export const usersApi = {

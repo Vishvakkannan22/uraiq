@@ -18,6 +18,7 @@ export const STANDARDS = [
   { id: 'sexual', label: 'Adult content', blurb: 'Explicit material and solicitation' },
   { id: 'selfharm', label: 'Self-harm', blurb: 'Routes to support rather than removal' },
   { id: 'spam', label: 'Spam & scams', blurb: 'Bulk messaging, phishing, impersonation' },
+  { id: 'slurs', label: 'Targeted slurs', blurb: 'Caste, body or sexual insults' },
 ]
 
 export const SEVERITY = {
@@ -26,6 +27,8 @@ export const SEVERITY = {
   blocked: { id: 'blocked', label: 'Held for review', tone: 'stop' },
 }
 
+import { TANGLISH_TERMS_RE } from './tanglishTerms'
+
 /* Stand-in signals until the agent endpoint is connected. Kept intentionally
    small and obvious so nobody mistakes it for the real classifier. */
 const SIGNALS = [
@@ -33,6 +36,10 @@ const SIGNALS = [
   { re: /\b(shut up|get lost|nobody likes you)\b/i, standard: 'harassment', severity: 'guidance' },
   { re: /\b(kill|hurt|destroy) (you|him|her|them)\b/i, standard: 'threats', severity: 'blocked' },
   { re: /\b(free money|click this link|crypto giveaway)\b/i, standard: 'spam', severity: 'blocked' },
+  /* Real enforcement happens server-side (moderation.service.ts) on send.
+     This copy exists so the composer flags the same terms instantly, before
+     the debounced network check ever fires — see tanglishTerms.js. */
+  { re: TANGLISH_TERMS_RE, standard: 'slurs', severity: 'blocked' },
 ]
 
 const REPHRASINGS = {
@@ -43,6 +50,10 @@ const REPHRASINGS = {
   ],
   threats: ['I’m frustrated and stepping away from this conversation.'],
   spam: ['Sharing a link — happy to explain the context first.'],
+  slurs: [
+    'I am really frustrated right now — can we talk about this calmly?',
+    'I would rather not use that word. Let me say this differently.',
+  ],
 }
 
 /**

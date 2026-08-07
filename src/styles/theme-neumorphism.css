@@ -1,0 +1,62 @@
+/* ============================================================
+   UraiQ — Neumorphism theme (opt-in, via Settings → Appearance)
+
+   A second skin over the same component tree. Every component already
+   renders through the token layer (var(--surface), var(--e1), var(--border)…),
+   so this file is the entire theme: redefine the tokens, touch no component.
+
+   The soft-UI look comes from two things:
+     1. Surfaces match the page background instead of sitting on white —
+        depth comes only from shadow, so a raised card must be the same
+        material as what it's resting on.
+     2. Every shadow is a PAIR drawn from the base color itself — a light
+        highlight (as if lit from the top-left) and a dark shadow (bottom-
+        right) — rather than a single neutral drop shadow. That's what
+        reads as "pressed into" or "extruded out of" soft plastic instead
+        of "a card floating above a page."
+
+   The brand gradient is deliberately left untouched: one vivid accent
+   (the primary CTA, the outgoing bubble, the send button) against an
+   otherwise monochrome surface is what keeps this legible as UraiQ and
+   not a generic soft-UI template.
+   ============================================================ */
+
+:root[data-theme="neumorphism"] {
+  --bg: #E9E4F5;
+  --pane: #E9E4F5;
+  --surface: #E9E4F5;
+  --surface-2: #E9E4F5;
+  --surface-solid: #E9E4F5;
+
+  /* Chrome no longer needs translucency to read as "above" content — it's
+     the same material, distinguished by shadow alone. */
+  --chrome-bg: #E9E4F5;
+  --chrome-blur: none;
+
+  /* Hard edges fight the soft-shadow language, so borders step back to
+     near-invisible; dividers stay just visible enough to separate rows
+     that have no shadow of their own to do it. */
+  --border: rgba(255, 255, 255, 0.5);
+  --border-strong: rgba(163, 150, 205, 0.30);
+  --divider: rgba(163, 150, 205, 0.24);
+
+  --track: #DFDAF1;
+  --hover: rgba(163, 150, 205, 0.14);
+  --pressed: rgba(163, 150, 205, 0.24);
+
+  /* Raised: light top-left, shadow bottom-right, both tinted from the base
+     violet rather than neutral black — the material stays "violet plastic"
+     at every depth instead of drifting grey the deeper the shadow gets. */
+  --e1: 4px 4px 8px rgba(163, 150, 205, 0.38), -4px -4px 8px rgba(255, 255, 255, 0.85);
+  --e2: 7px 7px 16px rgba(163, 150, 205, 0.42), -7px -7px 16px rgba(255, 255, 255, 0.9);
+  --e3: 12px 12px 28px rgba(163, 150, 205, 0.46), -10px -10px 24px rgba(255, 255, 255, 0.95);
+  --e4: 18px 18px 42px rgba(163, 150, 205, 0.5), -14px -14px 32px rgba(255, 255, 255, 1);
+
+  /* Pressed-in: the same pair, inverted with `inset` — this is what a text
+     field or an active/selected control should look like: sunken into the
+     surface rather than sitting on it. */
+  --e-inset: inset 3px 3px 7px rgba(163, 150, 205, 0.42), inset -3px -3px 7px rgba(255, 255, 255, 0.9);
+
+  --e-brand: 5px 5px 14px rgba(147, 51, 234, 0.30), -3px -3px 10px rgba(255, 255, 255, 0.55);
+  --e-brand-lg: 8px 8px 22px rgba(147, 51, 234, 0.36), -4px -4px 14px rgba(255, 255, 255, 0.6);
+}

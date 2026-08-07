@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Bell, ChevronLeft, ChevronRight, FileText, Ghost, HardDrive, Lock, LogOut,
-  QrCode, ScanEye, ShieldCheck, ShieldOff, Timer, Trash2, UserPen,
+  Bell, Check, ChevronLeft, ChevronRight, FileText, Ghost, HardDrive, Loader2,
+  Lock, LogOut, Palette, QrCode, ScanEye, ShieldCheck, ShieldOff, Timer,
+  Trash2, UserPen,
 } from 'lucide-react'
 import Sheet from '../../components/ui/Sheet'
 import Avatar from '../../components/ui/Avatar'
@@ -12,7 +13,13 @@ import Toggle from '../../components/ui/Toggle'
 import { ease, springPop } from '../../lib/motion'
 import { STANDARDS, standing } from '../../lib/moderation'
 import { auth } from '../../lib/api'
+import { useTheme } from '../../lib/theme'
 import { blockedUsers, notificationPrefs, storageBreakdown } from '../../data/mockData'
+
+const APPEARANCES = [
+  { id: 'default', label: 'Default', blurb: 'The standard UraiQ look — flat surfaces, layered shadow.' },
+  { id: 'neumorphism', label: 'Neumorphism', blurb: 'Soft, extruded surfaces that look pressed from the same material.' },
+]
 
 const FILTER_LEVELS = [
   { id: 'standard', label: 'Standard', blurb: 'Blocks clear breaches, warns on borderline wording' },
@@ -29,6 +36,15 @@ const AVATAR_SWATCHES = [
 ]
 
 const BURN_OPTIONS = ['Off', '10s', '30s', '1m', '1h']
+
+/** The three fields this panel can change, seeded from the real signed-in user. */
+function toDraft(user) {
+  return {
+    displayName: user?.displayName ?? '',
+    bio: user?.bio ?? '',
+    avatarGradient: user?.avatarGradient ?? AVATAR_SWATCHES[0],
+  }
+}
 
 function Row({ icon: Icon, title, body, onClick, value, tint }) {
   return (
@@ -91,10 +107,47 @@ function ProfileCode({ seed }) {
   )
 }
 
-export default function SettingsSheet({ open, onClose, desktop, user, onUser, initialPanel = 'root' }) {
+export default function SettingsSheet({ open, onClose, desktop, user, onSaveProfile, initialPanel = 'root' }) {
   const navigate = useNavigate()
   const [panel, setPanel] = useState(initialPanel)
   const [filterLevel, setFilterLevel] = useState('standard')
+  const [appearance, setAppearance] = useTheme()
+
+  /* A local draft, separate from the committed `user` — typing updates this on
+     every keystroke, but nothing reaches the server (or the shared session
+     cache everyone else's view reads from) until Save. Reset whenever the
+     sheet opens or the underlying user changes, so a previous edit never
+     leaks into a fresh open. */
+  const [draft, setDraft] = useState(() => toDraft(user))
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
+
+  useEffect(() => {
+    if (open) {
+      setDraft(toDraft(user))
+      setSaveError(null)
+    }
+  }, [open, user])
+
+  async function saveProfile() {
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await onSaveProfile({
+        displayName: draft.displayName.trim(),
+        bio: draft.bio,
+        avatarGradient: draft.avatarGradient,
+      })
+      back()
+    } catch (err) {
+      /* Left open on failure — the server's message (e.g. "Name must be at
+         least 2 characters") names exactly what to fix, and closing would
+         throw the edit away along with it. */
+      setSaveError(err.message || 'Could not save your profile')
+    } finally {
+      setSaving(false)
+    }
+  }
   const [standards, setStandards] = useState(() =>
     Object.fromEntries(STANDARDS.map((x) => [x.id, true]))
   )
@@ -126,6 +179,13 @@ export default function SettingsSheet({ open, onClose, desktop, user, onUser, in
             <h3 style={{ fontSize: 'var(--fs-17)', marginBottom: 'var(--s4)' }}>Settings</h3>
             <div className="col" style={{ gap: 2 }}>
               <Row icon={UserPen} title="Edit profile" body="Name, handle, bio and avatar" onClick={() => setPanel('edit')} />
+              <Row
+                icon={Palette}
+                title="Appearance"
+                body="Switch the app's visual style"
+                value={APPEARANCES.find((a) => a.id === appearance)?.label}
+                onClick={() => setPanel('appearance')}
+              />
               <Row icon={ShieldCheck} title="Safety & moderation" body="How conversations are kept respectful" value={standing.label} onClick={() => setPanel('safety')} />
               <Row icon={Bell} title="Notifications" body="What reaches you, and when" onClick={() => setPanel('notifications')} />
               <Row icon={Lock} title="Privacy & security" body="Encryption, ghost mode, burn timer" onClick={() => setPanel('privacy')} />
@@ -144,17 +204,17 @@ export default function SettingsSheet({ open, onClose, desktop, user, onUser, in
         {panel === 'edit' && (
           <Panel key="edit" title="Edit profile" onBack={back}>
             <div className="col" style={{ alignItems: 'center', gap: 'var(--s3)', marginBottom: 'var(--s5)' }}>
-              <Avatar initials={user.initials} gradient={user.gradient} size={78} ring="unseen" />
+              <Avatar gradient={draft.avatarGradient} size={78} ring="unseen" />
               <div className="row" style={{ gap: 7 }}>
                 {AVATAR_SWATCHES.map((s) => (
                   <motion.button
                     key={s}
                     whileTap={{ scale: 0.9 }}
-                    className={`swatch ${user.gradient === s ? 'swatch--on' : ''}`}
+                    className={`swatch ${draft.avatarGradient === s ? 'swatch--on' : ''}`}
                     style={{ background: s }}
-                    onClick={() => onUser({ gradient: s })}
+                    onClick={() => setDraft((d) => ({ ...d, avatarGradient: s }))}
                     aria-label="Pick avatar colour"
-                    aria-pressed={user.gradient === s}
+                    aria-pressed={draft.avatarGradient === s}
                   />
                 ))}
               </div>
@@ -163,11 +223,25 @@ export default function SettingsSheet({ open, onClose, desktop, user, onUser, in
             <div className="col" style={{ gap: 'var(--s4)' }}>
               <div className="field">
                 <label className="field__label" htmlFor="p-name">Display name</label>
-                <input id="p-name" className="field__input" value={user.name} onChange={(e) => onUser({ name: e.target.value })} />
+                <input
+                  id="p-name"
+                  className="field__input"
+                  value={draft.displayName}
+                  onChange={(e) => setDraft((d) => ({ ...d, displayName: e.target.value }))}
+                  maxLength={60}
+                />
               </div>
+              {/* Handle is not editable here: it's how people find you in
+                  search, and it's tied to the account id, not the display
+                  name. Shown for reference only. */}
               <div className="field">
-                <label className="field__label" htmlFor="p-handle">Handle</label>
-                <input id="p-handle" className="field__input" value={user.handle} onChange={(e) => onUser({ handle: e.target.value })} />
+                <span className="field__label">Handle</span>
+                <div
+                  className="field__input"
+                  style={{ display: 'flex', alignItems: 'center', color: 'var(--text-4)' }}
+                >
+                  @{user.handle}
+                </div>
               </div>
               <div className="field">
                 <label className="field__label" htmlFor="p-bio">Bio</label>
@@ -175,13 +249,53 @@ export default function SettingsSheet({ open, onClose, desktop, user, onUser, in
                   id="p-bio"
                   className="field__input"
                   style={{ height: 84, padding: 'var(--s3) var(--s4)', resize: 'none', lineHeight: 1.5 }}
-                  value={user.bio}
-                  onChange={(e) => onUser({ bio: e.target.value })}
+                  value={draft.bio}
+                  onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))}
+                  maxLength={280}
                 />
               </div>
             </div>
 
-            <button className="btn btn--primary btn--block" style={{ marginTop: 'var(--s5)' }} onClick={back}>Done</button>
+            {saveError && (
+              <div className="notice notice--error" role="alert" style={{ marginTop: 'var(--s4)' }}>
+                {saveError}
+              </div>
+            )}
+
+            <button
+              className="btn btn--primary btn--block"
+              style={{ marginTop: 'var(--s5)' }}
+              onClick={saveProfile}
+              disabled={saving || !draft.displayName.trim()}
+            >
+              {saving ? <Loader2 size={16} className="spin" /> : 'Save'}
+            </button>
+          </Panel>
+        )}
+
+        {panel === 'appearance' && (
+          <Panel key="appearance" title="Appearance" onBack={back}>
+            <p style={{ fontSize: 'var(--fs-13)', color: 'var(--text-4)', marginBottom: 'var(--s4)', lineHeight: 1.5 }}>
+              Applies instantly, on this device only.
+            </p>
+            <div className="col" style={{ gap: 'var(--s1)' }}>
+              {APPEARANCES.map((a) => (
+                <button
+                  key={a.id}
+                  className={`choice ${appearance === a.id ? 'choice--on' : ''}`}
+                  onClick={() => setAppearance(a.id)}
+                  aria-pressed={appearance === a.id}
+                >
+                  <span className="grow" style={{ minWidth: 0, textAlign: 'left' }}>
+                    <span className="choice__title">{a.label}</span>
+                    <span className="choice__body">{a.blurb}</span>
+                  </span>
+                  {appearance === a.id && (
+                    <span className="choice__check"><Check size={13} strokeWidth={3.2} /></span>
+                  )}
+                </button>
+              ))}
+            </div>
           </Panel>
         )}
 
@@ -236,7 +350,7 @@ export default function SettingsSheet({ open, onClose, desktop, user, onUser, in
                     <div style={{ fontSize: 'var(--fs-14)', fontWeight: 620, color: 'var(--text)' }}>{x.label}</div>
                     <div style={{ fontSize: 'var(--fs-12)', color: 'var(--text-4)' }}>{x.blurb}</div>
                   </div>
-                  {x.id === 'threats' || x.id === 'selfharm' ? (
+                  {x.id === 'threats' || x.id === 'selfharm' || x.id === 'slurs' ? (
                     <span className="pill pill--success">Always on</span>
                   ) : (
                     <Toggle
@@ -250,8 +364,10 @@ export default function SettingsSheet({ open, onClose, desktop, user, onUser, in
             </div>
 
             <p style={{ fontSize: 'var(--fs-12)', color: 'var(--text-4)', marginTop: 'var(--s4)' }}>
-              Checks run before a message is delivered. Threats and self-harm can't be
-              switched off — the first protects other people, the second routes to support.
+              Checks run before a message is delivered. Threats, self-harm and targeted
+              slurs can't be switched off — the first protects other people, the second
+              routes to support, the third keeps this space free of caste, body and
+              sexual insults.
             </p>
           </Panel>
         )}
@@ -433,8 +549,8 @@ export default function SettingsSheet({ open, onClose, desktop, user, onUser, in
             <div className="col" style={{ alignItems: 'center', gap: 'var(--s4)' }}>
               <div className="code-card">
                 <ProfileCode seed={user.handle} />
-                <Avatar initials={user.initials} gradient={user.gradient} size={44} style={{ marginTop: 'var(--s3)' }} />
-                <div style={{ fontSize: 'var(--fs-15)', fontWeight: 680, color: 'var(--text)', marginTop: 'var(--s2)' }}>{user.name}</div>
+                <Avatar gradient={user.avatarGradient} size={44} style={{ marginTop: 'var(--s3)' }} />
+                <div style={{ fontSize: 'var(--fs-15)', fontWeight: 680, color: 'var(--text)', marginTop: 'var(--s2)' }}>{user.displayName}</div>
                 <div style={{ fontSize: 'var(--fs-13)', color: 'var(--text-4)' }}>{user.handle}</div>
               </div>
               <p style={{ fontSize: 'var(--fs-12)', color: 'var(--text-4)', textAlign: 'center', maxWidth: 260 }}>

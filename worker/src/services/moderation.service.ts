@@ -1,5 +1,6 @@
 import type { Env, ModerationResult } from '../types'
 import type { Logger } from '../utils/logger'
+import { TANGLISH_TERMS_RE } from './tanglishTerms'
 
 /**
  * The safety agent. Runs before a message is persisted or delivered.
@@ -48,6 +49,10 @@ const REPHRASINGS: Record<string, string[]> = {
   spam: ['Sharing a link — happy to explain the context first.'],
   selfharm: [],
   sexual: [],
+  slurs: [
+    'I am really frustrated right now — can we talk about this calmly?',
+    'I would rather not use that word. Let me say this differently.',
+  ],
 }
 
 const REASONS: Record<string, string> = {
@@ -57,6 +62,7 @@ const REASONS: Record<string, string> = {
   sexual: 'This breaches the adult content standard.',
   selfharm: 'It sounds like this is a hard moment. Support options are available.',
   spam: 'This looks like spam or a scam.',
+  slurs: 'This uses language that is not allowed here.',
 }
 
 export const CLEAR: ModerationResult = {
@@ -149,6 +155,9 @@ const SIGNALS: Array<{ re: RegExp; standard: string; severity: 'guidance' | 'blo
   { re: /\b(idiot|stupid|moron|loser|pathetic)\b/i, standard: 'harassment', severity: 'guidance' },
   { re: /\b(kill|hurt|destroy)\s+(you|him|her|them)\b/i, standard: 'threats', severity: 'blocked' },
   { re: /\b(free money|crypto giveaway|click this link)\b/i, standard: 'spam', severity: 'blocked' },
+  /* Tamil / Tanglish targeted-insult and slur lexicon — see tanglishTerms.ts
+     for the stem list and the false-positive notes on a few of its entries. */
+  { re: TANGLISH_TERMS_RE, standard: 'slurs', severity: 'blocked' },
 ]
 
 function localRules(text: string): ModerationResult {

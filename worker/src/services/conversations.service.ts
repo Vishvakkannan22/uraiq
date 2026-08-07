@@ -39,7 +39,8 @@ export async function list(env: Env, db: Db, userId: string): Promise<Conversati
   const peers = await Promise.all(visible.map(({ profile }) => toPublicUser(env, profile)))
 
   return visible.map(({ row }, index) => {
-    const last = row.last_message_id ? messageById.get(row.last_message_id) : null
+    const shownId = visibleLastMessageId(row.last_message_id, row.cleared_before_id)
+    const last = shownId ? messageById.get(shownId) : null
     return {
       id: row.id,
       type: 'direct',
@@ -51,6 +52,22 @@ export async function list(env: Env, db: Db, userId: string): Promise<Conversati
       updatedAt: row.last_message_at ?? row.updated_at,
     }
   })
+}
+
+/**
+ * The last message id, unless this viewer cleared the chat at or after it.
+ *
+ * ULIDs sort lexicographically by creation time, so "at or before the clear
+ * point" is a plain string comparison — the same trick read receipts already
+ * use for `peerLastReadMessageId <= message.id`.
+ */
+function visibleLastMessageId(
+  lastMessageId: string | null,
+  clearedBeforeId: string | null
+): string | null {
+  if (!lastMessageId) return null
+  if (clearedBeforeId && lastMessageId <= clearedBeforeId) return null
+  return lastMessageId
 }
 
 /**
@@ -124,6 +141,28 @@ export async function assertMember(db: Db, conversationId: string, userId: strin
   if (!member) throw forbidden('Not a member of this conversation')
 }
 
+/**
+ * Clear chat — hides this member's history up to the conversation's current
+ * last message. The peer's copy of every one of those rows is untouched: nothing
+ * is deleted, nothing is even flagged on the message itself, only this one
+ * member's cursor moves. Calling it again later moves the cursor further
+ * forward to whatever is newest at that moment.
+ */
+export async function clearChat(
+  db: Db,
+  conversationId: string,
+  userId: string,
+  logger: Logger
+): Promise<{ clearedAt: number }> {
+  await assertMember(db, conversationId, userId)
+
+  const view = await conversations.findForMember(db, conversationId, userId)
+  await conversations.setClearedCursor(db, conversationId, userId, view?.last_message_id ?? null)
+
+  logger.info('chat cleared', { conversationId, userId })
+  return { clearedAt: Date.now() }
+}
+
 async function hydrate(
   env: Env,
   db: Db,
@@ -139,8 +178,9 @@ async function hydrate(
 
   /* This one genuinely depends on the row above — the id comes from it. */
   let lastMessage: MessageRow | null = null
-  if (view?.last_message_id) {
-    lastMessage = await messages.findById(db, view.last_message_id)
+  const shownId = view ? visibleLastMessageId(view.last_message_id, view.cleared_before_id) : null
+  if (shownId) {
+    lastMessage = await messages.findById(db, shownId)
   }
 
   return {

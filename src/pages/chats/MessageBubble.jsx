@@ -124,8 +124,6 @@ export default function MessageBubble({
     <motion.div
       layout="position"
       {...messageIn}
-      onMouseEnter={() => onActivate(msg.id)}
-      onMouseLeave={() => onActivate(null)}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -224,7 +222,14 @@ export default function MessageBubble({
               match && 'bubble--match',
             ].filter(Boolean).join(' ')}
             style={dimmed ? { opacity: 0.4 } : undefined}
-            onClick={() => onActivate(active ? null : msg.id)}
+            onClick={(e) => {
+              /* Stopped so this doesn't also reach the thread's own click
+                 handler, which closes whatever menu is open on any click that
+                 isn't on a bubble — without this, opening the menu and
+                 immediately closing it again would happen on the same click. */
+              e.stopPropagation()
+              onActivate(active ? null : msg.id)
+            }}
           >
             {(starred || pinned) && (
               <span className="bubble__flags" aria-hidden>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { chatsApi } from './api'
 import { createChatSocket } from './realtime/socket'
+import { emitConversationChanged } from './events'
 
 /**
  * One conversation: history, live updates, optimistic sends.
@@ -244,6 +245,20 @@ export function useChatThread(conversationId, meId) {
     [conversationId]
   )
 
+  /**
+   * Clear chat: hides this device's view of the history so far. The other
+   * participant's copy is untouched server-side — see the route's doc comment.
+   *
+   * Cleared locally first for an immediate empty thread, then the list is
+   * told to refetch its preview for this conversation (see lib/events.js).
+   */
+  const clearChat = useCallback(async () => {
+    await chatsApi.clearChat(conversationId)
+    setMessages([])
+    setCursor(null)
+    emitConversationChanged(conversationId)
+  }, [conversationId])
+
   const retryFailed = useCallback(
     (clientId) => {
       const message = messages.find((m) => m.clientId === clientId)
@@ -295,6 +310,7 @@ export function useChatThread(conversationId, meId) {
     send,
     edit,
     remove,
+    clearChat,
     retryFailed,
     setTyping,
     markRead,

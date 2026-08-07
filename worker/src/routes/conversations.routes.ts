@@ -52,3 +52,21 @@ export async function getConversation(ctx: RequestContext): Promise<Response> {
     conversation: await conversationsService.getOne(ctx.env, db, ctx.params.id, auth.userId),
   })
 }
+
+/**
+ * POST /conversations/:id/clear
+ *
+ * Removes this user's view of the history so far. The other participant's
+ * copy — and the messages themselves — are unaffected; see
+ * conversations.service.clearChat for why a cursor rather than a delete.
+ */
+export async function clearChat(ctx: RequestContext): Promise<Response> {
+  const auth = requireAuth(ctx)
+  await enforceRateLimit(ctx.env, 'write', auth.userId, RATE_LIMITS.write)
+
+  const logger = createLogger(ctx.env, { requestId: ctx.requestId, route: 'conversations.clear' })
+  const db = createDb(ctx.env, logger)
+
+  const { clearedAt } = await conversationsService.clearChat(db, ctx.params.id, auth.userId, logger)
+  return json({ ok: true, clearedAt })
+}

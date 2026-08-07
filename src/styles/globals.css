@@ -2,6 +2,7 @@
 @import '@fontsource/fredoka/500.css';
 @import '@fontsource/fredoka/600.css';
 @import './tokens.css';
+@import './theme-neumorphism.css';
 @import './components.css';
 
 *, *::before, *::after { box-sizing: border-box; }

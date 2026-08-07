@@ -23,6 +23,7 @@ export function useThread(chatId) {
     send: sendMessage,
     edit: editMessage,
     remove: removeMessage,
+    clearChat,
   } = thread
   const { retry: retryConversation } = conversation
 
@@ -116,6 +117,7 @@ export function useThread(chatId) {
     send,
     edit: editMessage,
     remove: removeMessage,
+    clearChat,
     react,
     retry,
   }

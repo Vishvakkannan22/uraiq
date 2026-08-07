@@ -8,40 +8,11 @@
  * working untouched.
  */
 
-const DAY_MS = 86_400_000
+/* All date/time formatting lives in one place, fixed to IST — see
+   lib/time.js for why that file exists at all. */
+import { timeLabel, listTimeLabel, dayLabel } from '../time'
 
-function startOfDay(ts) {
-  const d = new Date(ts)
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
-}
-
-/** Whole calendar days between `ts` and today — not a duration in hours. */
-function daysAgo(ts) {
-  return Math.round((startOfDay(Date.now()) - startOfDay(ts)) / DAY_MS)
-}
-
-export function timeLabel(ts) {
-  return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-}
-
-/** Compact stamp for the list: time today, weekday this week, date beyond. */
-export function listTimeLabel(ts) {
-  if (!ts) return ''
-  const days = daysAgo(ts)
-  if (days === 0) return timeLabel(ts)
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return new Date(ts).toLocaleDateString([], { weekday: 'short' })
-  return new Date(ts).toLocaleDateString([], { day: 'numeric', month: 'short' })
-}
-
-export function dayLabel(ts) {
-  const days = daysAgo(ts)
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return new Date(ts).toLocaleDateString([], { weekday: 'long' })
-  return new Date(ts).toLocaleDateString([], { day: 'numeric', month: 'long' })
-}
+export { timeLabel, listTimeLabel, dayLabel }
 
 const KIND_LABEL = {
   image: 'Photo',

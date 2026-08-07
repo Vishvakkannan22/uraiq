@@ -39,6 +39,7 @@ router.get('/users/:handle', userRoutes.getUser)
 router.get('/conversations', conversationRoutes.listConversations)
 router.post('/conversations', conversationRoutes.createConversation)
 router.get('/conversations/:id', conversationRoutes.getConversation)
+router.post('/conversations/:id/clear', conversationRoutes.clearChat)
 
 // ---- Messages -------------------------------------------------------------
 router.get('/conversations/:id/messages', messageRoutes.listMessages)

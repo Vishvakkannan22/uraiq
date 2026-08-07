@@ -2,9 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  ChevronDown, ChevronLeft, CloudOff, Flag, Loader2, Lock, MessagesSquare, Phone,
-  Pin, Search, CalendarClock, CheckCircle2, Circle, ShieldCheck, ShieldX, Sparkles,
-  Star, Video, WifiOff, X,
+  ChevronDown, ChevronLeft, CloudOff, Eraser, Flag, Loader2, Lock, MessagesSquare,
+  MoreVertical, Phone, Pin, Search, CalendarClock, CheckCircle2, Circle, ShieldCheck,
+  ShieldX, Sparkles, Star, Video, WifiOff, X,
 } from 'lucide-react'
 import Header from '../../layout/Header'
 import Avatar from '../../components/ui/Avatar'
@@ -22,6 +22,8 @@ import { ease, springSnap } from '../../lib/motion'
 import { COOLDOWN, COOLDOWN_THRESHOLD, healthOf } from '../../lib/conversationHealth'
 import { notesFor, resumeFor } from '../../lib/assistant'
 import { useThread } from '../../lib/chat/useThread'
+import { lastSeenLabel } from '../../lib/time'
+import { useClockTick } from '../../lib/useClockTick'
 import { smartRepliesByChat } from '../../data/mockData'
 
 /** Below this many pixels from the bottom counts as "at the latest message". */
@@ -31,24 +33,6 @@ function bodyOf(m) {
   return m.text || m.caption || m.translation || ''
 }
 
-/**
- * Last seen, at the precision the value actually supports.
- *
- * Presence expires from KV after 90 seconds, so anything recent is reported
- * vaguely rather than to the minute — a precise time would imply a certainty
- * the data does not have.
- */
-function lastSeenLabel(lastSeenAt) {
-  if (!lastSeenAt) return 'Offline'
-  const minutes = Math.floor((Date.now() - lastSeenAt) / 60000)
-  if (minutes < 2) return 'Last seen just now'
-  if (minutes < 60) return `Last seen ${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `Last seen ${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return days === 1 ? 'Last seen yesterday' : `Last seen ${days}d ago`
-}
-
 export default function ChatThread() {
   const { chatId } = useParams()
   const navigate = useNavigate()
@@ -56,8 +40,14 @@ export default function ChatThread() {
 
   const {
     chat, messages, loading, error, notFound, connection,
-    send: submit, edit: applyEdit, remove: removeMessage, react, retry, setTyping,
+    send: submit, edit: applyEdit, remove: removeMessage, clearChat, react, retry, setTyping,
   } = useThread(chatId)
+
+  /* "Last seen 5 minutes ago" in the header depends on elapsed time, not on
+     any prop here changing — without this it freezes at whatever age it had
+     during the last message/typing/presence event, silently going stale
+     between them. */
+  useClockTick()
 
   const [replyTo, setReplyTo] = useState(null)
   const [activeMsg, setActiveMsg] = useState(null)
@@ -81,6 +71,10 @@ export default function ChatThread() {
      disagreed — but it must be visible, or the message vanishes silently. */
   const [refused, setRefused] = useState(null)
   const [sendError, setSendError] = useState(null)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [clearError, setClearError] = useState(null)
 
   const scrollRef = useRef(null)
 
@@ -95,7 +89,21 @@ export default function ChatThread() {
     setCooldownDismissed(false)
     setRefused(null)
     setSendError(null)
+    setMoreOpen(false)
+    setClearConfirmOpen(false)
+    setClearError(null)
   }, [chatId])
+
+  /* Escape closes the message action menu, matching the outside-click
+     dismissal below rather than requiring a second click on the same bubble. */
+  useEffect(() => {
+    if (!activeMsg) return
+    const onKey = (e) => {
+      if (e.key === 'Escape') setActiveMsg(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [activeMsg])
 
   useLayoutEffect(() => {
     const el = scrollRef.current
@@ -237,6 +245,19 @@ export default function ChatThread() {
     setActiveMsg(null)
   }
 
+  async function handleClearChat() {
+    setClearing(true)
+    setClearError(null)
+    try {
+      await clearChat()
+      setClearConfirmOpen(false)
+    } catch (err) {
+      setClearError(err.message || 'Could not clear this chat')
+    } finally {
+      setClearing(false)
+    }
+  }
+
   return (
     <div className="chat-focus">
       <Header
@@ -281,6 +302,50 @@ export default function ChatThread() {
             </button>
             <button className="iconbtn iconbtn--muted" disabled aria-label="Voice call unavailable"><Phone size={19} /></button>
             <button className="iconbtn iconbtn--muted" disabled aria-label="Video call unavailable"><Video size={19} /></button>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <button
+                className="iconbtn"
+                onClick={() => setMoreOpen((v) => !v)}
+                aria-label="More options"
+                aria-pressed={moreOpen}
+              >
+                <MoreVertical size={19} />
+              </button>
+              <AnimatePresence>
+                {moreOpen && (
+                  <>
+                    {/* A full-screen click-catcher, not stopPropagation on the
+                        button: it needs to close on a click anywhere else,
+                        including inside the message list, and that list
+                        already has its own click handler this must not
+                        fight with. */}
+                    <div
+                      onClick={() => setMoreOpen(false)}
+                      style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-popover)' }}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.94 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.94 }}
+                      transition={springSnap}
+                      className="popover"
+                      style={{
+                        position: 'absolute', top: '100%', right: 0, marginTop: 8,
+                        width: 180, zIndex: 'var(--z-popover)',
+                      }}
+                    >
+                      <button
+                        className="popover__item"
+                        style={{ color: 'var(--danger)' }}
+                        onClick={() => { setMoreOpen(false); setClearConfirmOpen(true) }}
+                      >
+                        <Eraser size={16} /> Clear chat
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
           </>
         }
       >
@@ -361,6 +426,7 @@ export default function ChatThread() {
       <div
         ref={scrollRef}
         onScroll={onScroll}
+        onClick={() => activeMsg && setActiveMsg(null)}
         className="scroll grow"
         style={{ padding: '0 var(--gutter) var(--s3)', display: 'flex', flexDirection: 'column' }}
       >
@@ -613,6 +679,49 @@ export default function ChatThread() {
         subject={chat.name}
       />
 
+      <Sheet
+        open={clearConfirmOpen}
+        onClose={() => { setClearConfirmOpen(false); setClearError(null) }}
+        desktop={isDesktop}
+      >
+        <div className="row" style={{ gap: 'var(--s3)', marginBottom: 'var(--s4)' }}>
+          <div
+            className="row"
+            style={{
+              justifyContent: 'center', width: 38, height: 38, borderRadius: 12,
+              background: 'color-mix(in srgb, var(--danger) 14%, transparent)', color: 'var(--danger)',
+            }}
+          >
+            <Eraser size={18} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: 'var(--fs-17)' }}>Clear this chat?</h3>
+            <div style={{ fontSize: 'var(--fs-12)', color: 'var(--text-4)' }}>Only on your side</div>
+          </div>
+        </div>
+        <p style={{ fontSize: 'var(--fs-14)', color: 'var(--text-3)', lineHeight: 1.5 }}>
+          Every message will be removed from your view of this chat. {chat.name.split(' ')[0]} keeps
+          their copy — nothing is deleted for them, and the conversation itself stays in your list.
+        </p>
+        {clearError && (
+          <div className="notice notice--error" role="alert" style={{ marginTop: 'var(--s4)' }}>
+            {clearError}
+          </div>
+        )}
+        <div className="row" style={{ gap: 'var(--s2)', marginTop: 'var(--s5)' }}>
+          <button
+            className="btn btn--secondary btn--sm grow"
+            onClick={() => setClearConfirmOpen(false)}
+            disabled={clearing}
+          >
+            Cancel
+          </button>
+          <button className="btn btn--danger btn--sm grow" onClick={handleClearChat} disabled={clearing}>
+            {clearing ? <Loader2 size={16} className="spin" /> : 'Clear chat'}
+          </button>
+        </div>
+      </Sheet>
+
       <ShareSheet
         open={Boolean(forwardMsg)}
         onClose={() => setForwardMsg(null)}
@@ -626,7 +735,7 @@ export default function ChatThread() {
           Kept on this device only.
         </p>
         {starredList.length === 0 ? (
-          <StatePanel compact icon={Star} title="Nothing starred" body="Hover a message and tap the star to keep it here." />
+          <StatePanel compact icon={Star} title="Nothing starred" body="Tap a message and choose the star to keep it here." />
         ) : (
           <div className="col" style={{ gap: 'var(--s2)' }}>
             {starredList.map((m) => (

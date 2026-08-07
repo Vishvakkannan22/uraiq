@@ -18,6 +18,8 @@ import { useIsDesktop } from '../../lib/useMediaQuery'
 import { healthOf } from '../../lib/conversationHealth'
 import { useScrolled } from '../../lib/useScrolled'
 import { useChatList } from '../../lib/chat/useChatList'
+import { useClockTick } from '../../lib/useClockTick'
+import { listTimeLabel } from '../../lib/time'
 
 function MiniPulse({ status }) {
   const state = status === 'read' || status === 'seen' ? 'seen' : status === 'delivered' || status === 'received' ? 'received' : 'sending'
@@ -114,7 +116,10 @@ function ChatRow({ chat, muted, archived, onArchive, onMute }) {
               />
               {chat.pinned && <Pin size={11} style={{ color: 'var(--text-4)', fill: 'currentColor' }} />}
               <span className="tnum" style={{ marginLeft: 'auto', fontSize: 'var(--fs-11)', color: chat.unread ? 'var(--brand-600)' : 'var(--text-4)', fontWeight: chat.unread ? 650 : 500, flexShrink: 0 }}>
-                {chat.time}
+                {/* Recomputed from the raw timestamp on every render, not read
+                    from a string baked in when the list was last fetched —
+                    otherwise "2m ago" keeps saying "2m ago" 20 minutes later. */}
+                {listTimeLabel(chat.updatedAt)}
               </span>
             </div>
 
@@ -151,6 +156,10 @@ function ChatRow({ chat, muted, archived, onArchive, onMute }) {
 export default function ChatListPane({ onResetWidth, canResetWidth }) {
   const isDesktop = useIsDesktop()
   const { chats, loading, error, retry } = useChatList()
+  /* Nothing else re-renders this list on a timer, so without this a row's
+     "2m ago" would freeze until an unrelated event (a new message anywhere,
+     a refetch) happened to redraw it. */
+  useClockTick()
   const [query, setQuery] = useState('')
   /* Local overrides layered over the server's flags, rather than a set of ids:
      the server already knows what is muted and archived, and this only records

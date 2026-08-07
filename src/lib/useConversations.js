@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { chatsApi } from './api'
+import { onConversationChanged } from './events'
 
 /**
  * GET /conversations, with the four states a real network actually has:
@@ -50,6 +51,11 @@ export function useConversations() {
   useEffect(() => {
     load()
   }, [load])
+
+  /* On desktop the list and an open thread are mounted side by side. Clearing
+     that thread's chat changes what this list should show for it (no
+     preview, no unread) with nothing else to trigger a refetch. */
+  useEffect(() => onConversationChanged(() => load()), [load])
 
   /** Move a conversation to the top after a new message, without a refetch. */
   const bump = useCallback((conversationId, lastMessage) => {

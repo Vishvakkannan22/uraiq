@@ -32,6 +32,7 @@ export const endpoints = {
   sendMessage: (conversationId) => `/conversations/${conversationId}/messages`,
   message: (conversationId, messageId) => `/conversations/${conversationId}/messages/${messageId}`,
   markRead: (conversationId) => `/conversations/${conversationId}/read`,
+  clearChat: (conversationId) => `/conversations/${conversationId}/clear`,
 
   /* Durable Object socket, one per conversation. */
   chatSocket: (conversationId) => `/conversations/${conversationId}/ws`,

@@ -3,6 +3,7 @@ import type { Db } from '../db/client'
 import type { Logger } from '../utils/logger'
 import * as messages from '../db/messages.repo'
 import * as receipts from '../db/receipts.repo'
+import * as conversationsRepo from '../db/conversations.repo'
 import { badRequest, forbidden, notFound } from '../utils/errors'
 import { ulid } from '../utils/ids'
 import { MAX_MESSAGE_LENGTH } from '../config'
@@ -53,10 +54,22 @@ export async function listPage(
 ): Promise<MessagePage> {
   await assertMember(db, conversationId, userId)
 
-  const [rows, peerCursor] = await Promise.all([
-    messages.listPage(db, conversationId, limit, before),
+  /* My own clear-chat boundary has to be known before the page query runs —
+     it is a bind parameter, not something to reconcile after the fact — so it
+     goes in the same parallel batch as the peer's read cursor rather than
+     after it. */
+  const [clearedRow, peerCursor] = await Promise.all([
+    conversationsRepo.getClearedCursor(db, conversationId, userId),
     receipts.findPeerCursor(db, conversationId, userId),
   ])
+
+  const rows = await messages.listPage(
+    db,
+    conversationId,
+    limit,
+    before,
+    clearedRow?.cleared_before_id ?? null
+  )
 
   return {
     /* Query is newest-first so the cursor is the oldest row; the client renders
