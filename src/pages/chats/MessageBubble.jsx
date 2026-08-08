@@ -68,15 +68,26 @@ function VoiceNote({ id, duration, out }) {
   )
 }
 
+/**
+ * `sent` is its own state, distinct from `sending` — a message the server has
+ * durably accepted but the peer's device has not yet acknowledged (most often
+ * because they're offline right now) is not "still trying," it already
+ * succeeded. Showing the same spinning-orbit mark for both would tell an
+ * honest send "in progress" forever whenever the peer is away, which reads as
+ * broken rather than as "delivered whenever they're next reachable."
+ */
 function pulseState(status) {
   if (status === 'seen' || status === 'read') return 'seen'
   if (status === 'received' || status === 'delivered') return 'received'
+  if (status === 'sent') return 'sent'
   return 'sending'
 }
 
+const PULSE_LABEL = { sending: 'Sending', sent: 'Sent', received: 'Received', seen: 'Seen' }
+
 function MessagePulse({ status, time, onOpen }) {
   const state = pulseState(status)
-  const label = state === 'seen' ? 'Seen' : state === 'received' ? 'Received' : 'Sending'
+  const label = PULSE_LABEL[state]
 
   return (
     <button
@@ -94,6 +105,7 @@ function MessagePulse({ status, time, onOpen }) {
             <span className="message-pulse__dot" />
           </>
         )}
+        {state === 'sent' && <Check className="message-pulse__check" size={12} strokeWidth={3} />}
         {state === 'received' && (
           <>
             <span className="message-pulse__ring" />

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { chatsApi } from './api'
-import { onConversationChanged } from './events'
+import { onConversationChanged, onInboxMessage } from './events'
 
 /**
  * GET /conversations, with the four states a real network actually has:
@@ -73,6 +73,12 @@ export function useConversations() {
       return next
     })
   }, [])
+
+  /* A message arriving over the inbox socket (see lib/realtime/inbox.js) for
+     a conversation with no thread open has nothing else to move this list's
+     row to the top — the thread's own socket, which normally does that, does
+     not exist until someone opens it. */
+  useEffect(() => onInboxMessage(bump), [bump])
 
   return { conversations, loading, error, retry: load, bump }
 }

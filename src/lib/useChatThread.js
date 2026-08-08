@@ -1,7 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { chatsApi } from './api'
 import { createChatSocket } from './realtime/socket'
-import { emitConversationChanged } from './events'
+import { emitConversationChanged, emitConversationRead } from './events'
+
+/**
+ * `crypto.randomUUID()` only exists in a secure context — HTTPS, or the
+ * `localhost` exemption — so it's silently `undefined` on a phone loading
+ * this app over plain HTTP from a LAN IP (e.g. testing against a laptop's
+ * dev server), and calling it throws. `getRandomValues` carries no such
+ * restriction, so build the UUID from that instead; it's what `randomUUID`
+ * itself does internally, this just skips the secure-context gate.
+ */
+function randomId() {
+  if (crypto.randomUUID) return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
 
 /**
  * One conversation: history, live updates, optimistic sends.
@@ -174,7 +191,7 @@ export function useChatThread(conversationId, meId) {
 
   const send = useCallback(
     async (body, { replyToId } = {}) => {
-      const clientId = crypto.randomUUID()
+      const clientId = randomId()
       const optimistic = {
         /* Sorts after every real ULID, so an in-flight message stays pinned to
            the bottom until the server's row replaces it. */
@@ -289,9 +306,15 @@ export function useChatThread(conversationId, meId) {
     (lastReadMessageId) => {
       if (!lastReadMessageId) return
       /* Both paths: the socket for an instant tick on the peer's screen, the
-         POST for the durable cursor and the unread counter. */
+         POST for the durable cursor and the unread counter. The nav badge
+         (lib/unread.js) listens for the POST to land so it can pull the
+         zeroed count back down — it may have already counted this message
+         optimistically the instant it arrived over the inbox socket. */
       socketRef.current?.send({ type: 'read', lastReadMessageId })
-      chatsApi.markRead(conversationId, lastReadMessageId).catch(() => {})
+      chatsApi
+        .markRead(conversationId, lastReadMessageId)
+        .then(() => emitConversationRead(conversationId))
+        .catch(() => {})
     },
     [conversationId]
   )

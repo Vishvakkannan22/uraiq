@@ -38,8 +38,14 @@ export type ClientEvent =
   | { type: 'ping'; t?: number }
   | { type: 'typing'; typing: boolean }
   | { type: 'read'; lastReadMessageId: string }
-  /** Acknowledge receipt of specific messages, which stamps delivered_at. */
-  | { type: 'delivered'; messageIds: string[] }
+  /**
+   * Acknowledge receipt of specific messages, which stamps delivered_at.
+   * `conversationId` is optional on a ConversationRoom socket — the room
+   * already knows which conversation it is — but required on the inbox
+   * socket, which spans every conversation a user is in and needs to be told
+   * which Durable Object to relay the resulting `delivered` event to.
+   */
+  | { type: 'delivered'; messageIds: string[]; conversationId?: string }
 
 export function encode(event: ServerEvent): string {
   return JSON.stringify(event)

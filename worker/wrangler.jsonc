@@ -37,11 +37,26 @@
     }
   ],
 
+  // Binds `wrangler dev` to every network interface, not just loopback, so
+  // the API is reachable from other devices on the LAN (a phone testing
+  // against this machine's IP, for instance) without anyone needing to
+  // remember a `--ip 0.0.0.0` flag on the command line. A plain `npm run dev`
+  // — run from anywhere, by anyone — now does the right thing by default.
+  // Mirrors `server.host: true` in the frontend's vite.config.js.
+  "dev": {
+    "ip": "0.0.0.0",
+    "port": 8787
+  },
+
   "durable_objects": {
     "bindings": [
       {
         "name": "CONVERSATION",
         "class_name": "ConversationRoom"
+      },
+      {
+        "name": "INBOX",
+        "class_name": "UserInbox"
       }
     ]
   },
@@ -54,6 +69,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ConversationRoom"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["UserInbox"]
     }
   ],
 
@@ -74,7 +93,7 @@
     // the developer's own machine.
     //
     // REPLACE this whole value with your real front-end origin before deploying.
-    "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175",
+    "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175,http://10.248.231.145:5173",
     "ACCESS_TTL_SECONDS": "900",
     "REFRESH_TTL_SECONDS": "2592000",
     "LOG_LEVEL": "info"

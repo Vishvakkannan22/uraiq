@@ -46,17 +46,87 @@
 
   /* Raised: light top-left, shadow bottom-right, both tinted from the base
      violet rather than neutral black — the material stays "violet plastic"
-     at every depth instead of drifting grey the deeper the shadow gets. */
-  --e1: 4px 4px 8px rgba(163, 150, 205, 0.38), -4px -4px 8px rgba(255, 255, 255, 0.85);
-  --e2: 7px 7px 16px rgba(163, 150, 205, 0.42), -7px -7px 16px rgba(255, 255, 255, 0.9);
-  --e3: 12px 12px 28px rgba(163, 150, 205, 0.46), -10px -10px 24px rgba(255, 255, 255, 0.95);
-  --e4: 18px 18px 42px rgba(163, 150, 205, 0.5), -14px -14px 32px rgba(255, 255, 255, 1);
+     at every depth instead of drifting grey the deeper the shadow gets.
+
+     Blur stays close to the offset (roughly 1.6-1.8x, not the ~2.3x a first
+     pass had) — enough softness to read as "extruded plastic" rather than a
+     hard drop shadow, but tight enough that an edge is still an edge instead
+     of a haze bleeding several steps into the surrounding surface. Opacity
+     is nudged up slightly to compensate, so tightening the blur doesn't also
+     wash the depth out. */
+  --e1: 3px 3px 6px rgba(163, 150, 205, 0.40), -3px -3px 6px rgba(255, 255, 255, 0.85);
+  --e2: 5px 5px 11px rgba(163, 150, 205, 0.44), -5px -5px 11px rgba(255, 255, 255, 0.9);
+  --e3: 8px 8px 17px rgba(163, 150, 205, 0.48), -7px -7px 15px rgba(255, 255, 255, 0.95);
+  --e4: 12px 12px 25px rgba(163, 150, 205, 0.52), -10px -10px 20px rgba(255, 255, 255, 1);
 
   /* Pressed-in: the same pair, inverted with `inset` — this is what a text
      field or an active/selected control should look like: sunken into the
      surface rather than sitting on it. */
-  --e-inset: inset 3px 3px 7px rgba(163, 150, 205, 0.42), inset -3px -3px 7px rgba(255, 255, 255, 0.9);
+  --e-inset: inset 2px 2px 5px rgba(163, 150, 205, 0.46), inset -2px -2px 5px rgba(255, 255, 255, 0.9);
 
-  --e-brand: 5px 5px 14px rgba(147, 51, 234, 0.30), -3px -3px 10px rgba(255, 255, 255, 0.55);
-  --e-brand-lg: 8px 8px 22px rgba(147, 51, 234, 0.36), -4px -4px 14px rgba(255, 255, 255, 0.6);
+  --e-brand: 3px 3px 8px rgba(147, 51, 234, 0.34), -2px -2px 6px rgba(255, 255, 255, 0.55);
+  --e-brand-lg: 5px 5px 13px rgba(147, 51, 234, 0.40), -3px -3px 9px rgba(255, 255, 255, 0.6);
+}
+
+/* ============================================================
+   A handful of components bake their "flat vs. sunken" cue into a
+   literal box-shadow value instead of an e1/e-inset token — .search,
+   .composer__input and .field__input ship `inset 0 0 0 1px
+   transparent` (a hook reserved for the focus ring, not a resting
+   shadow), and .toggle__knob/.choice/.poll carry a hardcoded shadow
+   or lean on a bare --border outline. Token redefinition can't reach
+   those, so — scoped to this theme only — they're touched directly
+   here. Every other component still needs zero overrides.
+   ============================================================ */
+
+/* Text entry is the single clearest neumorphic cue — a field should
+   read as carved into the page, not as a flat tinted box sitting on
+   it. Focus keeps the carve and layers the brand ring on top. */
+:root[data-theme="neumorphism"] .search,
+:root[data-theme="neumorphism"] .composer__input {
+  background: var(--surface);
+  box-shadow: var(--e-inset);
+}
+:root[data-theme="neumorphism"] .search:focus-within,
+:root[data-theme="neumorphism"] .composer__input:focus-within {
+  background: var(--surface);
+  box-shadow: var(--e-inset), var(--ring);
+}
+
+:root[data-theme="neumorphism"] .field__input {
+  border-color: transparent;
+  box-shadow: var(--e-inset);
+}
+:root[data-theme="neumorphism"] .field__input:focus {
+  border-color: transparent;
+  box-shadow: var(--e-inset), var(--ring);
+}
+
+/* The knob is the one raised element living *inside* a sunken track —
+   its shadow gets the same violet tint as everything else instead of
+   the default theme's neutral ink, so it doesn't read as a foreign
+   material dropped onto soft plastic. */
+:root[data-theme="neumorphism"] .toggle__knob {
+  box-shadow: 2px 2px 4px rgba(163, 150, 205, 0.55), -1px -1px 3px rgba(255, 255, 255, 0.85);
+}
+
+/* Choice rows and poll options are selectable slots, not cards — on
+   a surface that now matches the page exactly, a 1px --border alone
+   is invisible. The poll tray lifts slightly; its options sit carved
+   into that tray, which is what makes them read as "pick one of
+   these" rather than plain rows of text. */
+:root[data-theme="neumorphism"] .choice,
+:root[data-theme="neumorphism"] .poll__opt {
+  box-shadow: var(--e-inset);
+}
+:root[data-theme="neumorphism"] .choice:hover,
+:root[data-theme="neumorphism"] .poll__opt:not(:disabled):hover {
+  box-shadow: var(--e-inset), inset 0 0 0 1px var(--brand-300);
+}
+:root[data-theme="neumorphism"] .choice--on,
+:root[data-theme="neumorphism"] .poll__opt--mine {
+  box-shadow: var(--e-inset), inset 0 0 0 1.5px var(--brand-400);
+}
+:root[data-theme="neumorphism"] .poll {
+  box-shadow: var(--e1);
 }

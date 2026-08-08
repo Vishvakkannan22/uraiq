@@ -36,6 +36,8 @@ export const endpoints = {
 
   /* Durable Object socket, one per conversation. */
   chatSocket: (conversationId) => `/conversations/${conversationId}/ws`,
+  /* Durable Object socket, one per signed-in user — see lib/realtime/inbox.js. */
+  inboxSocket: (userId) => `/inbox/${userId}/ws`,
 
   // ---- Media ----
   upload: () => '/media',

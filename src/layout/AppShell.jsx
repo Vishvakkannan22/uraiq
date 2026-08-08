@@ -8,11 +8,16 @@ import CommandPalette from '../components/ui/CommandPalette'
 import { navItems } from './navItems'
 import { useIsDesktop } from '../lib/useMediaQuery'
 import { sectionSwipe } from '../lib/motion'
+import { useInbox } from '../lib/realtime/inbox'
 
 /** Tab-bar order, which is also the left-to-right axis screens travel along. */
 const ORDER = navItems.map((n) => n.to)
 
 export default function AppShell() {
+  /* Session-wide delivery channel — see lib/realtime/inbox.js for why this
+     has to live above any single thread. */
+  useInbox()
+
   const isDesktop = useIsDesktop()
   const location = useLocation()
   const inThread = useMatch('/chats/:chatId')

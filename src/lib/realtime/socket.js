@@ -3,12 +3,20 @@ import { endpoints } from '../api/endpoints'
 import { getToken } from '../auth'
 
 /**
- * WebSocket client for a Durable Object chat room.
+ * WebSocket client for a Durable Object room.
  *
  * On Cloudflare each conversation is one Durable Object holding the socket
- * set, so this connects per chat rather than once per app. Pair it with the
- * server-side WebSocket Hibernation API (`state.acceptWebSocket`) — otherwise
- * an idle room bills for wall-clock duration.
+ * set, so `createChatSocket` connects per chat rather than once per app —
+ * paired with the server-side WebSocket Hibernation API
+ * (`state.acceptWebSocket`), so an idle room bills for wall-clock duration.
+ * `createInboxSocket` (below) connects to the per-*user* room instead, for
+ * the one thing that has to work regardless of which conversation is open:
+ * see lib/realtime/inbox.js.
+ *
+ * Both share the same connection machinery — reconnect backoff, heartbeat,
+ * the handshake — since a Durable Object socket is a Durable Object socket
+ * regardless of what it's keyed by; only the URL and the room identifier
+ * embedded in log/emit calls differ.
  *
  * Auth is passed as a WebSocket subprotocol, not a query string: browsers
  * cannot set headers on a WebSocket handshake, and a token in the URL ends up
@@ -28,6 +36,14 @@ const HEARTBEAT_MS = 25000
 const PONG_GRACE_MS = 10000
 
 export function createChatSocket(conversationId, handlers = {}) {
+  return createRoomSocket(endpoints.chatSocket(conversationId), handlers)
+}
+
+export function createInboxSocket(userId, handlers = {}) {
+  return createRoomSocket(endpoints.inboxSocket(userId), handlers)
+}
+
+function createRoomSocket(path, handlers = {}) {
   let ws = null
   let attempt = 0
   let closed = false
@@ -58,7 +74,7 @@ export function createChatSocket(conversationId, handlers = {}) {
     if (closed || !WS_URL) return
 
     const token = getToken()
-    const url = `${WS_URL}${endpoints.chatSocket(conversationId)}`
+    const url = `${WS_URL}${path}`
 
     try {
       ws = token ? new WebSocket(url, ['bearer', token]) : new WebSocket(url)

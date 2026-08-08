@@ -12,6 +12,7 @@ export interface Env {
   DB: D1Database
   KV: KVNamespace
   CONVERSATION: DurableObjectNamespace
+  INBOX: DurableObjectNamespace
   /* Optional so the Worker still boots if the binding is removed; the
      moderation service falls back to its rule net. */
   AI?: Ai

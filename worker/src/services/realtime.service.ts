@@ -33,8 +33,36 @@ export async function broadcast(
 }
 
 /**
- * TODO(notifications): when a message is sent and the recipient has no socket
- * in the room, they should get a push.
+ * Fan-out from the REST layer into a user's inbox Durable Object — one per
+ * recipient, independent of which conversation (if any) they have open.
+ *
+ * This is what makes "delivered" happen without the recipient opening the
+ * specific thread a message landed in: their inbox socket is live wherever
+ * they are in the app, receives the push, and acks it back. Same best-effort
+ * contract as `broadcast` — the write already committed, this is optimisation.
+ */
+export async function notifyInbox(
+  env: Env,
+  userId: string,
+  event: ServerEvent,
+  logger?: Logger
+): Promise<void> {
+  try {
+    const stub = env.INBOX.get(env.INBOX.idFromName(userId))
+    await stub.fetch('https://inbox/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    })
+  } catch (err) {
+    logger?.error('inbox notify failed', err, { userId, event: event.type })
+  }
+}
+
+/**
+ * TODO(push-notifications): when a message is sent and the recipient has no
+ * live socket anywhere — the conversation room *and* the inbox both miss them
+ * — they should get a native push.
  *
  * Not implemented because it needs a provider decision (Web Push / APNs / FCM)
  * and a device-token table, and because the queue that would have carried the

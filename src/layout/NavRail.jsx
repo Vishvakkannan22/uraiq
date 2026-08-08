@@ -5,9 +5,13 @@ import { navItems } from './navItems'
 import AppMark from '../components/brand/AppMark'
 import Avatar from '../components/ui/Avatar'
 import { useMe } from '../lib/useMe'
+import { useUnreadCount } from '../lib/unread'
 
 export default function NavRail() {
   const me = useMe()
+  /* Live, not mock data — see lib/unread.js for how this stays in sync with
+     messages arriving in real time. */
+  const unread = useUnreadCount()
 
   return (
     <nav className="rail">
@@ -15,7 +19,9 @@ export default function NavRail() {
         <AppMark size={34} radius={11} />
       </div>
 
-      {navItems.map(({ key, label, to, icon: Icon, badge }) => (
+      {navItems.map(({ key, label, to, icon: Icon }) => {
+        const badge = key === 'messages' ? unread : 0
+        return (
         <NavLink
           key={key}
           to={to}
@@ -56,7 +62,8 @@ export default function NavRail() {
             </>
           )}
         </NavLink>
-      ))}
+        )
+      })}
     </nav>
   )
 }

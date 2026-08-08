@@ -16,6 +16,7 @@ import * as messageRoutes from './routes/messages.routes'
 import * as moderationRoutes from './routes/moderation.routes'
 
 export { ConversationRoom } from './ws/ConversationRoom'
+export { UserInbox } from './ws/UserInbox'
 
 const router = new Router()
 
@@ -75,6 +76,23 @@ export default {
         )
       } catch (err) {
         logger.error('websocket upgrade failed', err, { conversationId: wsMatch[1] })
+        return new Response('Upgrade failed', { status: 500 })
+      }
+    }
+
+    /* The per-user inbox socket — one always-on connection per signed-in
+       device, independent of which conversation (if any) is open. See
+       ws/UserInbox.ts for why this exists: it is what makes "delivered" fire
+       without the recipient opening the specific thread a message landed in. */
+    const inboxMatch = url.pathname.match(/^\/inbox\/([^/]+)\/ws$/)
+    if (inboxMatch) {
+      try {
+        const stub = env.INBOX.get(env.INBOX.idFromName(inboxMatch[1]))
+        return await stub.fetch(
+          new Request(`https://inbox/ws?u=${encodeURIComponent(inboxMatch[1])}`, request)
+        )
+      } catch (err) {
+        logger.error('inbox websocket upgrade failed', err, { userId: inboxMatch[1] })
         return new Response('Upgrade failed', { status: 500 })
       }
     }

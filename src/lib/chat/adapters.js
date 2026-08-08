@@ -65,9 +65,16 @@ export function conversationToChat(conversation, meId) {
 /**
  * An outgoing message's delivery state, in the order it actually progresses:
  *
- *   sending  — in flight, or accepted by the server but not yet on the peer's
- *              device (they may be offline)
- *   received — the peer's device acknowledged it
+ *   sending  — in flight: no server-confirmed id yet, this is still the
+ *              optimistic row
+ *   sent     — the server has it durably, but the peer's device has not
+ *              acknowledged it — most often because the peer is offline or
+ *              the app isn't open anywhere for them right now. This is a real,
+ *              possibly long-lived state, not a transient one: collapsing it
+ *              into "sending" would tell the sender their message never left,
+ *              when it in fact did.
+ *   received — the peer's device acknowledged it (their inbox socket or an
+ *              open thread stamped delivered_at — see worker/src/ws/UserInbox.ts)
  *   seen     — the peer's read cursor has passed it
  *
  * The read check compares ids, not timestamps: ULIDs sort lexicographically in
@@ -80,7 +87,7 @@ function statusOf(message, out, peerLastReadId) {
   if (message.pending) return 'sending'
   if (peerLastReadId && message.id <= peerLastReadId) return 'seen'
   if (message.deliveredAt) return 'received'
-  return 'sending'
+  return 'sent'
 }
 
 /**

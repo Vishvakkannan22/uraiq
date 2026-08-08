@@ -4,15 +4,21 @@ import { spring } from '../lib/motion'
 import { navItems } from './navItems'
 import Avatar from '../components/ui/Avatar'
 import { useMe } from '../lib/useMe'
+import { useUnreadCount } from '../lib/unread'
 
 export default function TabBar() {
   /* The signed-in user's own avatar. Null for the moment between mount and
      /auth/me returning, which Avatar renders as an empty gradient chip. */
   const me = useMe()
+  /* Live, not mock data — see lib/unread.js for how this stays in sync with
+     messages arriving in real time. */
+  const unread = useUnreadCount()
 
   return (
     <nav className="tabbar">
-      {navItems.map(({ key, label, to, icon: Icon, badge, center }) => (
+      {navItems.map(({ key, label, to, icon: Icon, center }) => {
+        const badge = key === 'messages' ? unread : 0
+        return (
         <NavLink
           key={key}
           to={to}
@@ -77,7 +83,8 @@ export default function TabBar() {
             )
           }
         </NavLink>
-      ))}
+        )
+      })}
     </nav>
   )
 }

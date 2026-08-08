@@ -278,30 +278,39 @@ export default function ChatThread() {
             >
               <Search size={19} />
             </button>
-            <button
-              className="iconbtn"
-              onClick={() => setStarredOpen(true)}
-              aria-label="Starred messages"
-              style={starred.size > 0 ? { color: 'var(--warning)' } : undefined}
-            >
-              <Star size={19} fill={starred.size > 0 ? 'currentColor' : 'none'} />
-            </button>
-            <button
-              className="iconbtn"
-              onClick={() => setHealthOpen(true)}
-              aria-label={`Conversation health ${health?.score}`}
-              title="Conversation health"
-            >
-              <HealthRing score={health?.score ?? 0} tone={health?.band.tone} size={21} />
-            </button>
-            <button className="iconbtn" onClick={() => setSummaryOpen(true)} aria-label="Summarize conversation">
-              <Sparkles size={19} style={{ color: 'var(--brand-600)' }} />
-            </button>
-            <button className="iconbtn" onClick={() => setReportOpen(true)} aria-label="Report conversation">
-              <Flag size={18} />
-            </button>
-            <button className="iconbtn iconbtn--muted" disabled aria-label="Voice call unavailable"><Phone size={19} /></button>
-            <button className="iconbtn iconbtn--muted" disabled aria-label="Video call unavailable"><Video size={19} /></button>
+            {/* Desktop has room to lay every action out flat. A phone-width
+                header does not — eight 40px icon buttons alone is wider than
+                a 390px screen, which is what was squeezing the peer's name
+                and status out to nothing. Everything past Search and More
+                moves into the overflow menu below on mobile instead. */}
+            {isDesktop && (
+              <>
+                <button
+                  className="iconbtn"
+                  onClick={() => setStarredOpen(true)}
+                  aria-label="Starred messages"
+                  style={starred.size > 0 ? { color: 'var(--warning)' } : undefined}
+                >
+                  <Star size={19} fill={starred.size > 0 ? 'currentColor' : 'none'} />
+                </button>
+                <button
+                  className="iconbtn"
+                  onClick={() => setHealthOpen(true)}
+                  aria-label={`Conversation health ${health?.score}`}
+                  title="Conversation health"
+                >
+                  <HealthRing score={health?.score ?? 0} tone={health?.band.tone} size={21} />
+                </button>
+                <button className="iconbtn" onClick={() => setSummaryOpen(true)} aria-label="Summarize conversation">
+                  <Sparkles size={19} style={{ color: 'var(--brand-600)' }} />
+                </button>
+                <button className="iconbtn" onClick={() => setReportOpen(true)} aria-label="Report conversation">
+                  <Flag size={18} />
+                </button>
+                <button className="iconbtn iconbtn--muted" disabled aria-label="Voice call unavailable"><Phone size={19} /></button>
+                <button className="iconbtn iconbtn--muted" disabled aria-label="Video call unavailable"><Video size={19} /></button>
+              </>
+            )}
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <button
                 className="iconbtn"
@@ -331,9 +340,32 @@ export default function ChatThread() {
                       className="popover"
                       style={{
                         position: 'absolute', top: '100%', right: 0, marginTop: 8,
-                        width: 180, zIndex: 'var(--z-popover)',
+                        width: isDesktop ? 180 : 224, zIndex: 'var(--z-popover)',
                       }}
                     >
+                      {!isDesktop && (
+                        <>
+                          <button
+                            className="popover__item"
+                            style={starred.size > 0 ? { color: 'var(--warning)' } : undefined}
+                            onClick={() => { setMoreOpen(false); setStarredOpen(true) }}
+                          >
+                            <Star size={16} fill={starred.size > 0 ? 'currentColor' : 'none'} /> Starred messages
+                          </button>
+                          <button
+                            className="popover__item"
+                            onClick={() => { setMoreOpen(false); setHealthOpen(true) }}
+                          >
+                            <HealthRing score={health?.score ?? 0} tone={health?.band.tone} size={16} /> Conversation health
+                          </button>
+                          <button className="popover__item" onClick={() => { setMoreOpen(false); setSummaryOpen(true) }}>
+                            <Sparkles size={16} style={{ color: 'var(--brand-600)' }} /> Summarize
+                          </button>
+                          <button className="popover__item" onClick={() => { setMoreOpen(false); setReportOpen(true) }}>
+                            <Flag size={16} /> Report conversation
+                          </button>
+                        </>
+                      )}
                       <button
                         className="popover__item"
                         style={{ color: 'var(--danger)' }}
@@ -351,14 +383,20 @@ export default function ChatThread() {
       >
         <div className="row grow" style={{ gap: 'var(--s3)', minWidth: 0 }}>
           <Avatar initials={chat.initials} gradient={chat.gradient} size={36} status={chat.online ? 'online' : undefined} />
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div className="truncate" style={{ fontWeight: 660, fontSize: 'var(--fs-15)', color: 'var(--text)', letterSpacing: '-0.015em' }}>
               {chat.name}
             </div>
-            <div className="row" style={{ gap: 4, fontSize: 'var(--fs-12)', color: chat.typing ? 'var(--brand-700)' : 'var(--text-4)' }}>
-              <ShieldCheck size={11} style={{ color: 'var(--success)' }} />
-              {chat.encrypted && <Lock size={10} />}
-              {chat.typing ? 'typing…' : chat.online ? 'Active now' : lastSeenLabel(chat.lastSeenAt)}
+            {/* `min-width: 0` on the row plus `.truncate` on the text itself is
+                load-bearing at phone widths — without it, a long "Last seen…"
+                string has nowhere to shrink to and wraps one word per line,
+                turning a 60px header into 100+px instead of eliding cleanly. */}
+            <div className="row" style={{ gap: 4, minWidth: 0, fontSize: 'var(--fs-12)', color: chat.typing ? 'var(--brand-700)' : 'var(--text-4)' }}>
+              <ShieldCheck size={11} style={{ color: 'var(--success)', flexShrink: 0 }} />
+              {chat.encrypted && <Lock size={10} style={{ flexShrink: 0 }} />}
+              <span className="truncate">
+                {chat.typing ? 'typing…' : chat.online ? 'Active now' : lastSeenLabel(chat.lastSeenAt)}
+              </span>
             </div>
           </div>
         </div>

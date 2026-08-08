@@ -196,3 +196,27 @@ export function findUndelivered(db: Db, conversationId: string, recipientId: str
       .bind(conversationId, recipientId)
   )
 }
+
+/**
+ * Everything undelivered addressed to this user, across every conversation
+ * they are in — not just one thread.
+ *
+ * Used by the per-user inbox socket on connect, so "delivered" catches up the
+ * moment the recipient's app is reachable at all, rather than only when they
+ * happen to open the one thread a message arrived in.
+ */
+export function findUndeliveredForUser(db: Db, userId: string) {
+  return db.all<{ id: string; conversation_id: string }>(
+    'messages.findUndeliveredForUser',
+    db
+      .prepare(
+        `SELECT m.id, m.conversation_id
+           FROM messages m
+           JOIN conversation_members cm
+                ON cm.conversation_id = m.conversation_id AND cm.user_id = ?1
+          WHERE m.sender_id != ?1 AND m.delivered_at IS NULL AND m.deleted_at IS NULL
+          ORDER BY m.id DESC LIMIT 500`
+      )
+      .bind(userId)
+  )
+}

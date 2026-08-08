@@ -9,7 +9,8 @@ import { ulid } from '../utils/ids'
 import { MAX_MESSAGE_LENGTH } from '../config'
 import { assertMember } from './conversations.service'
 import { moderate } from './moderation.service'
-import { broadcast } from './realtime.service'
+import { broadcast, notifyInbox } from './realtime.service'
+import { findPeerId } from '../db/conversations.repo'
 
 /**
  * Row -> DTO.
@@ -159,6 +160,16 @@ export async function send(
   /* Fan-out must not sit on the sender's response — the message is durable the
      moment the write above committed. */
   ctx.waitUntil(broadcast(env, conversationId, { type: 'message', message: dto }, logger))
+
+  /* The conversation room only reaches a socket that has *this* thread open.
+     The recipient's inbox reaches them wherever they are in the app, which is
+     what lets "delivered" fire without them opening this specific chat. */
+  const peer = await findPeerId(db, conversationId, senderId)
+  if (peer) {
+    ctx.waitUntil(
+      notifyInbox(env, peer.user_id, { type: 'message', message: dto }, logger)
+    )
+  }
 
   logger.info('message sent', {
     conversationId,
@@ -318,4 +329,42 @@ export async function pendingDelivery(
 ): Promise<string[]> {
   const rows = await messages.findUndelivered(db, conversationId, recipientId)
   return rows.map((r) => r.id)
+}
+
+/**
+ * Stamp delivery for every undelivered message addressed to this user, across
+ * every conversation they are in — the inbox socket's connect-time catch-up.
+ *
+ * Grouped by conversation because that is the unit the caller broadcasts in:
+ * each sender's open thread (if any) needs its own `delivered` event on its
+ * own Durable Object.
+ */
+export async function markDeliveredForUser(
+  db: Db,
+  userId: string,
+  logger: Logger
+): Promise<{ conversationId: string; messageIds: string[]; deliveredAt: number }[]> {
+  const rows = await messages.findUndeliveredForUser(db, userId)
+  if (rows.length === 0) return []
+
+  const deliveredAt = Date.now()
+  await messages.markDelivered(
+    db,
+    rows.map((r) => r.id),
+    deliveredAt
+  )
+  logger.debug('messages delivered (inbox catch-up)', { userId, count: rows.length })
+
+  const byConversation = new Map<string, string[]>()
+  for (const r of rows) {
+    const list = byConversation.get(r.conversation_id)
+    if (list) list.push(r.id)
+    else byConversation.set(r.conversation_id, [r.id])
+  }
+
+  return [...byConversation].map(([conversationId, messageIds]) => ({
+    conversationId,
+    messageIds,
+    deliveredAt,
+  }))
 }
