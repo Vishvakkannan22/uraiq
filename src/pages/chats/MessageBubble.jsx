@@ -1,7 +1,7 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Check, Copy, Flame, Forward, Languages, Pause, Pencil, Pin, Play, Reply, Star, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
-import { ease, messageIn, spring, springSnap } from '../../lib/motion'
+import { ease, spring, springSnap } from '../../lib/motion'
 
 const EMOJI = ['❤️', '😂', '👍', '😮', '😢', '🔥']
 
@@ -85,9 +85,15 @@ function pulseState(status) {
 
 const PULSE_LABEL = { sending: 'Sending', sent: 'Sent', received: 'Received', seen: 'Seen' }
 
+/* Each state below is a structurally different mark (spinner, check, ring,
+   spark) — there's no shared shape to tween between, so "morph" here means a
+   scale/opacity crossfade rather than a literal path morph. Both the leaving
+   and entering mark are absolutely centred in the same fixed-size box, so
+   the swap never nudges the label/time next to it. */
 function MessagePulse({ status, time, onOpen }) {
   const state = pulseState(status)
   const label = PULSE_LABEL[state]
+  const reduced = useReducedMotion()
 
   return (
     <button
@@ -99,25 +105,36 @@ function MessagePulse({ status, time, onOpen }) {
       aria-label={`${label} at ${time}`}
     >
       <span className="message-pulse__mark" aria-hidden>
-        {state === 'sending' && (
-          <>
-            <span className="message-pulse__orbit" />
-            <span className="message-pulse__dot" />
-          </>
-        )}
-        {state === 'sent' && <Check className="message-pulse__check" size={12} strokeWidth={3} />}
-        {state === 'received' && (
-          <>
-            <span className="message-pulse__ring" />
-            <span className="message-pulse__core" />
-          </>
-        )}
-        {state === 'seen' && (
-          <>
-            <span className="message-pulse__spark" />
-            <span className="message-pulse__flare" />
-          </>
-        )}
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={state}
+            initial={reduced ? false : { opacity: 0, scale: 0.4 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.4 }}
+            transition={reduced ? { duration: 0.12 } : springSnap}
+            style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}
+          >
+            {state === 'sending' && (
+              <>
+                <span className="message-pulse__orbit" />
+                <span className="message-pulse__dot" />
+              </>
+            )}
+            {state === 'sent' && <Check className="message-pulse__check" size={12} strokeWidth={3} />}
+            {state === 'received' && (
+              <>
+                <span className="message-pulse__ring" />
+                <span className="message-pulse__core" />
+              </>
+            )}
+            {state === 'seen' && (
+              <>
+                <span className="message-pulse__spark" />
+                <span className="message-pulse__flare" />
+              </>
+            )}
+          </motion.span>
+        </AnimatePresence>
       </span>
       <span className="message-pulse__label">{label}</span>
       <span className="message-pulse__time">{time}</span>
@@ -127,15 +144,24 @@ function MessagePulse({ status, time, onOpen }) {
 
 export default function MessageBubble({
   msg, grouped, showAuthor, onReply, onReact, active, onActivate, onOpenStatus,
-  starred, pinned, match, dimmed, onStar, onPin, onCopy, onDelete, onForward, onEdit,
+  starred, pinned, match, dimmed, flash, onStar, onPin, onCopy, onDelete, onForward, onEdit,
+  onJumpTo,
 }) {
   const [draft, setDraft] = useState(null)
   const out = msg.from === 'me'
+  const reduced = useReducedMotion()
 
   return (
     <motion.div
       layout="position"
-      {...messageIn}
+      /* New messages only — `initial` runs once on mount, and each bubble is
+         already keyed by `msg.id` in the list above, so a message already on
+         screen never replays this when the list re-renders from a scroll or
+         an unrelated state change. Direction mirrors which side the bubble
+         lands on: mine arrives from the right, theirs from the left. */
+      initial={reduced ? false : { opacity: 0, y: 8, x: out ? 10 : -10 }}
+      animate={{ opacity: 1, y: 0, x: 0 }}
+      transition={reduced ? { duration: 0 } : springSnap}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -177,7 +203,7 @@ export default function MessageBubble({
                       whileHover={{ scale: 1.3, y: -2 }}
                       whileTap={{ scale: 0.88 }}
                       onClick={() => onReact(msg.id, e)}
-                      style={{ fontSize: 17, lineHeight: 1, padding: 4 }}
+                      style={{ fontSize: 'var(--fs-17)', lineHeight: 1, padding: 4 }}
                       aria-label={`React ${e}`}
                     >
                       {e}
@@ -232,6 +258,11 @@ export default function MessageBubble({
               'bubble',
               out ? 'bubble--out' : 'bubble--in',
               match && 'bubble--match',
+              flash && 'bubble--flash',
+              /* Lifts and detaches while its action bar is open, so the bar
+                 reads as belonging to *this* bubble rather than floating over
+                 the thread. */
+              active && 'bubble--lifted',
             ].filter(Boolean).join(' ')}
             style={dimmed ? { opacity: 0.4 } : undefined}
             onClick={(e) => {
@@ -250,10 +281,21 @@ export default function MessageBubble({
               </span>
             )}
             {msg.replyTo && (
-              <span className="bubble__quote">
+              /* A button, not a span: it navigates, so it has to be reachable
+                 by keyboard and announced as actionable. stopPropagation keeps
+                 the tap from also toggling this bubble's action menu. */
+              <button
+                type="button"
+                className="bubble__quote"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onJumpTo?.(msg.replyTo.id)
+                }}
+                aria-label={`Go to the message from ${msg.replyTo.author} being replied to`}
+              >
                 <b style={{ display: 'block', fontWeight: 650 }}>{msg.replyTo.author}</b>
                 <span className="truncate" style={{ display: 'block', opacity: 0.85 }}>{msg.replyTo.text}</span>
-              </span>
+              </button>
             )}
 
             {msg.kind === 'image' && (
@@ -356,14 +398,19 @@ export function DateDivider({ label }) {
 }
 
 export function TypingBubble() {
+  const reduced = useReducedMotion()
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.24, ease }}>
       <div className="bubble bubble--in bubble--typing" style={{ gap: 4, padding: '13px 15px', width: 'fit-content' }}>
         {[0, 1, 2].map((i) => (
           <motion.span
             key={i}
-            animate={{ opacity: [0.25, 1, 0.25], y: [0, -3, 0] }}
-            transition={{ duration: 1.15, repeat: Infinity, delay: i * 0.15 }}
+            animate={reduced ? { opacity: [0.4, 0.9, 0.4] } : { y: [0, -4, 0] }}
+            transition={
+              reduced
+                ? { duration: 1.15, repeat: Infinity, delay: i * 0.15, ease }
+                : { ...spring, repeat: Infinity, repeatDelay: 0.2, delay: i * 0.12 }
+            }
             style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--n-400)' }}
           />
         ))}

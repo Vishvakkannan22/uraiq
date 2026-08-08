@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useMatch } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import NavRail from './NavRail'
 import TabBar from './TabBar'
 import AppBackdrop from '../components/AppBackdrop'
 import CommandPalette from '../components/ui/CommandPalette'
 import { navItems } from './navItems'
-import { useIsDesktop } from '../lib/useMediaQuery'
 import { sectionSwipe } from '../lib/motion'
 import { useInbox } from '../lib/realtime/inbox'
 
@@ -18,7 +16,6 @@ export default function AppShell() {
      has to live above any single thread. */
   useInbox()
 
-  const isDesktop = useIsDesktop()
   const location = useLocation()
   const inThread = useMatch('/chats/:chatId')
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -37,8 +34,8 @@ export default function AppShell() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // On phones a thread takes over the whole screen, so the tab bar steps aside.
-  const showTabBar = !isDesktop && !inThread
+  // Threads take over the phone frame, so the dock steps aside for the composer.
+  const showTabBar = !inThread
 
   // Animate between top-level sections only — not between chats in the same list,
   // which would re-run the transition on every row tap.
@@ -54,11 +51,13 @@ export default function AppShell() {
   useEffect(() => { prevIndex.current = index }, [index])
 
   return (
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: 'var(--bg)' }}>
+    <div className="app-shell">
       <AppBackdrop />
-      {isDesktop && <NavRail />}
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, position: 'relative', zIndex: 1 }}>
+      {/* The rail is a flex sibling again, so this column simply takes the
+          remaining width — no reserved padding, and no gutter between the
+          rail and the chat list. */}
+      <div className="app-shell__phone">
         <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div

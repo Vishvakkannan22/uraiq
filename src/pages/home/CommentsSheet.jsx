@@ -20,7 +20,11 @@ function Comment({ c }) {
           <span style={{ fontSize: 'var(--fs-11)', color: 'var(--text-4)', flexShrink: 0 }}>{c.time}</span>
         </div>
         <p style={{ fontSize: 'var(--fs-14)', color: 'var(--text-2)', lineHeight: 1.45, marginTop: 2 }}>{c.text}</p>
-        <button className="comment__reply">Reply</button>
+        {/* TODO(milestone 2): no reply-to-comment endpoint exists yet — this
+            comment thread is flat, seeded local data. Disabled rather than
+            wired to a fake local reply, which would look real and then not
+            survive a reload. */}
+        <button className="comment__reply" disabled aria-label="Replies aren't available yet">Reply</button>
       </div>
       <button
         className={`comment__like ${liked ? 'comment__like--on' : ''}`}

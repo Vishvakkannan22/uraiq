@@ -28,7 +28,7 @@ function randomId() {
  * returns, and the optimistic row must be replaced, not duplicated. `clientId`
  * is what ties the three together.
  */
-export function useChatThread(conversationId, meId) {
+export function useChatThread(conversationId, meId, token) {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -41,6 +41,7 @@ export function useChatThread(conversationId, meId) {
   const socketRef = useRef(null)
   const typingTimer = useRef(null)
   const alive = useRef(true)
+  const historyRequest = useRef(0)
 
   /* Reset on every run — a cleanup-only effect stays false after StrictMode's
      simulated unmount and silently discards every later response. See the note
@@ -55,7 +56,13 @@ export function useChatThread(conversationId, meId) {
   /* ---------------------------------------------------------- history --- */
 
   const load = useCallback(async () => {
+    const requestId = ++historyRequest.current
     if (!conversationId) {
+      setLoading(false)
+      return
+    }
+    if (!token) {
+      setError(new Error('Your session is still initializing. Please try again.'))
       setLoading(false)
       return
     }
@@ -63,7 +70,10 @@ export function useChatThread(conversationId, meId) {
     setError(null)
     try {
       const data = await chatsApi.messages(conversationId)
-      if (!alive.current) return
+      /* A user can open another thread before this response arrives. Only the
+         active request may update this thread; otherwise the old response can
+         overwrite the new route's loading state and make its UI appear blank. */
+      if (!alive.current || requestId !== historyRequest.current) return
       setMessages(data?.messages ?? [])
       setCursor(data?.nextCursor ?? null)
       /* The peer's read cursor comes back with the page, so read ticks are
@@ -72,16 +82,17 @@ export function useChatThread(conversationId, meId) {
         setPeerRead({ messageId: data.peerLastReadMessageId, at: data.peerLastReadAt ?? null })
       }
     } catch (err) {
-      if (alive.current) setError(err)
+      if (alive.current && requestId === historyRequest.current) setError(err)
     } finally {
-      if (alive.current) setLoading(false)
+      if (alive.current && requestId === historyRequest.current) setLoading(false)
     }
-  }, [conversationId])
+  }, [conversationId, token])
 
   useEffect(() => {
     setMessages([])
     setCursor(null)
     setPeerRead({ messageId: null, at: null })
+    setError(null)
     load()
   }, [load])
 
@@ -96,7 +107,7 @@ export function useChatThread(conversationId, meId) {
   /* --------------------------------------------------------- realtime --- */
 
   useEffect(() => {
-    if (!conversationId) return
+    if (!conversationId || !token) return
 
     setPeerOnline(null)
     setPeerTyping(false)
@@ -173,7 +184,7 @@ export function useChatThread(conversationId, meId) {
       socket.close()
       socketRef.current = null
     }
-  }, [conversationId, meId])
+  }, [conversationId, meId, token])
 
   /* Acknowledge anything already on screen that arrived before the socket was
      ready — otherwise a message fetched by REST is never marked delivered. */

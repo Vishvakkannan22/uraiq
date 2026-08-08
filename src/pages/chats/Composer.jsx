@@ -3,11 +3,17 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Flame, Mic, Paperclip, SendHorizontal, ShieldAlert, ShieldX, Smile, Sparkles, X } from 'lucide-react'
 import { ease, spring, springSnap } from '../../lib/motion'
 import { useModeration } from '../../lib/useModeration'
+import { getDraft, setDraft as persistDraft, clearDraft } from '../../lib/drafts'
 
 const BURN_OPTIONS = ['Off', '5s', '10s', '30s', '1m']
 
-export default function Composer({ onSend, onTyping, replyTo, onCancelReply, peerName, onGuidance }) {
-  const [draft, setDraft] = useState('')
+export default function Composer({ conversationId, onSend, onTyping, replyTo, onCancelReply, peerName, onGuidance }) {
+  /* Seeded from the store so switching threads — or reloading entirely —
+     restores what was half-written. Keyed by conversationId in useState's
+     initialiser *and* re-seeded in an effect below, because the initialiser
+     only runs on the first mount and this component is reused across
+     conversations rather than remounted. */
+  const [draft, setDraft] = useState(() => getDraft(conversationId))
   const [burn, setBurn] = useState('Off')
   const [burnOpen, setBurnOpen] = useState(false)
   const ref = useRef(null)
@@ -16,6 +22,18 @@ export default function Composer({ onSend, onTyping, replyTo, onCancelReply, pee
   useEffect(() => {
     if (replyTo) ref.current?.focus()
   }, [replyTo])
+
+  /* Re-seed on every conversation change. Also resizes the textarea, since
+     restoring three lines of draft into a box still sized for one would clip
+     it until the next keystroke. */
+  useEffect(() => {
+    const stored = getDraft(conversationId)
+    setDraft(stored)
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    if (stored) el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }, [conversationId])
 
   /* One typing signal per burst, not one per keystroke. The socket auto-expires
      it after a few seconds, so the only edges that matter are empty -> typing
@@ -38,6 +56,28 @@ export default function Composer({ onSend, onTyping, replyTo, onCancelReply, pee
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }
+
+  /* Debounced: every keystroke writing to localStorage would also notify the
+     drafts store, re-rendering the whole chat list mid-word. A short delay
+     costs nothing — the only reader is a list you are not looking at while
+     typing — and the flush-on-unmount below covers leaving before it fires. */
+  const persistTimer = useRef(null)
+  function scheduleDraftSave(value) {
+    clearTimeout(persistTimer.current)
+    persistTimer.current = setTimeout(() => persistDraft(conversationId, value), 300)
+  }
+
+  /* `draft` is read through a ref so this effect can flush the latest value
+     without re-subscribing on every keystroke. */
+  const latestDraft = useRef(draft)
+  latestDraft.current = draft
+  useEffect(
+    () => () => {
+      clearTimeout(persistTimer.current)
+      persistDraft(conversationId, latestDraft.current)
+    },
+    [conversationId]
+  )
 
   /* The guidance pass runs on the draft, before send — the point is to catch
      it while it is still editable, not to remove it afterwards. */
@@ -68,6 +108,11 @@ export default function Composer({ onSend, onTyping, replyTo, onCancelReply, pee
     if (!draft.trim() || blocked) return
     onSend(draft.trim(), burn)
     setDraft('')
+    /* Cancel the pending save before clearing, or the debounced write from the
+       last keystroke lands *after* this and resurrects the sent text as a
+       draft. */
+    clearTimeout(persistTimer.current)
+    clearDraft(conversationId)
     signalTyping('')
     if (ref.current) ref.current.style.height = 'auto'
   }
@@ -196,7 +241,12 @@ export default function Composer({ onSend, onTyping, replyTo, onCancelReply, pee
             rows={1}
             value={draft}
             placeholder={`Message ${peerName}…`}
-            onChange={(e) => { setDraft(e.target.value); autosize(e.target); signalTyping(e.target.value) }}
+            onChange={(e) => {
+              setDraft(e.target.value)
+              autosize(e.target)
+              signalTyping(e.target.value)
+              scheduleDraftSave(e.target.value)
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() }
             }}
@@ -228,9 +278,9 @@ export default function Composer({ onSend, onTyping, replyTo, onCancelReply, pee
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.5, opacity: 0 }}
               transition={spring}
-              className="iconbtn composer__btn"
+              className="iconbtn composer__btn iconbtn--muted"
               disabled
-              aria-label="Record voice message"
+              aria-label="Voice messages unavailable"
             >
               <Mic size={19} />
             </motion.button>

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll } from 'framer-motion'
-import { MessageCircle, PenLine } from 'lucide-react'
+import { MessageCircle, PenLine, Users } from 'lucide-react'
 import AppMark from '../../components/brand/AppMark'
 import AiMark from '../../components/brand/AiMark'
 import Segmented from '../../components/ui/Segmented'
@@ -151,7 +151,7 @@ export default function HomeFeed() {
         {shown.length === 0 ? (
           <StatePanel
             compact
-            icon={PenLine}
+            icon={Users}
             title="Nothing here yet"
             body="Follow a few people and their posts will show up in this tab."
             actionLabel="Browse For you"

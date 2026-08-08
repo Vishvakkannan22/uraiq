@@ -56,7 +56,10 @@ export const bentoItem = {
    The exit is a short duration and the entrance a spring on purpose — a
    symmetric pair reads as sluggish, since you spend the exit waiting. */
 export function sectionSwipe(dir, reduced) {
-  const dx = reduced ? 0 : 44
+  /* Tightened from 44 — a floating nav reads as a small, precise object, and
+     the old travel distance was tuned for an edge-docked bar that filled
+     the whole width beneath it. */
+  const dx = reduced ? 0 : 28
   return {
     initial: { x: dir * dx, opacity: 0 },
     animate: {

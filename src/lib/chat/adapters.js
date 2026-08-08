@@ -141,6 +141,10 @@ export function messagesToView(messages, { meId, peerName, peerLastReadId, peerR
         : undefined,
       replyTo: parent
         ? {
+            /* Carried so the quote can be tapped to jump to the original —
+               without the id the quote is a dead end that shows you the text
+               but cannot take you to it. */
+            id: parent.id,
             author: Boolean(meId) && parent.senderId === meId ? 'You' : peerName,
             text: previewOf(parent),
           }

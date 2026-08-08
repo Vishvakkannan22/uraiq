@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "project": {
+    "name": "uraiq",
+    "productType": null,
+    "stack": [
+      "react",
+      "vite"
+    ]
+  },
+  "sources": {
+    "tokens": [],
+    "components": [
+      "src/components/ui"
+    ],
+    "assets": [
+      "src/assets"
+    ],
+    "instructions": []
+  },
+  "design": {
+    "colorMode": "unknown",
+    "colors": {},
+    "typography": {},
+    "spacing": {},
+    "radius": {},
+    "shadows": {},
+    "motion": {},
+    "density": "unknown"
+  },
+  "components": {
+    "installed": [
+      "Avatar",
+      "CommandPalette",
+      "HealthRing",
+      "Lightbox",
+      "ReportSheet",
+      "RichText",
+      "Segmented",
+      "ShareSheet",
+      "Sheet",
+      "Skeleton",
+      "StatePanel",
+      "SwipeRow",
+      "Toast",
+      "Toggle"
+    ],
+    "preferredPrimitives": [],
+    "patterns": []
+  },
+  "constraints": {
+    "must": [],
+    "avoid": []
+  },
+  "decisions": [
+    {
+      "choice": "Use the existing mobile UraiQ welcome composition as the post-sign-in handoff, with Continue entering Chats.",
+      "source": "user-provided reference"
+    },
+    {
+      "choice": "Make the signed-in experience chat-first: Continue and fallback routes open Chats, with soft white mobile surfaces, rounded 1:1 conversation cards, purple message actions, and a lifted bottom dock.",
+      "source": "user-provided mobile chat references"
+    },
+    {
+      "choice": "Replace the old dark desktop/social shell with a centered mobile phone frame on wide screens, force stored dark theme back to the light reference palette, redirect legacy Home/Reels routes into Chats, and add a purple UraiQ Direct inbox card.",
+      "source": "user feedback after seeing old UI"
+    },
+    {
+      "choice": "Make the mobile shell function like a real 1:1 chat app: bottom tabs route to real Chats, Calls, New, Find, and You screens; New uses the live user search/create-chat API; Calls and Find are backed by the live conversation list rather than social mock sections.",
+      "source": "user request for fully functional realtime UI with proper alignment"
+    }
+  ],
+  "evidence": [
+    {
+      "fact": "components.installed",
+      "source": "src/components/ui"
+    },
+    {
+      "fact": "project.stack:react",
+      "source": "package.json"
+    },
+    {
+      "fact": "project.stack:vite",
+      "source": "package.json"
+    }
+  ],
+  "generatedAt": "2026-08-08T08:23:11.286Z"
+}

@@ -3,7 +3,11 @@
 @import '@fontsource/fredoka/600.css';
 @import './tokens.css';
 @import './theme-neumorphism.css';
+@import './theme-dark.css';
 @import './components.css';
+/* Last: accessibility preferences compose *over* whichever theme is active,
+   so they have to be able to win against a theme's own token values. */
+@import './a11y.css';
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -15,7 +19,13 @@ body {
   color: var(--text-2);
   font-family: var(--font-ui);
   font-size: var(--fs-15);
-  line-height: 1.45;
+  /* Tokens, not literals — the readable-typeface preference widens all three
+     (see styles/a11y.css). They resolve to the former hardcoded values until
+     it's turned on. This rule sits after that import in the cascade, so the
+     token indirection is what lets the preference through at all. */
+  line-height: var(--text-leading);
+  letter-spacing: var(--text-tracking);
+  word-spacing: var(--text-word-spacing);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -69,9 +79,17 @@ svg { display: block; flex-shrink: 0; }
 }
 
 /* Controls sitting on media or on the brand gradient, where a purple
-   ring has nothing to contrast against. */
+   ring has nothing to contrast against. `.follow-btn` is excluded once it's
+   already-following (`--on`): that state drops the gradient for a
+   transparent background, and a white ring there would have the opposite
+   problem — invisible against the page instead of the button. */
 .iconbtn--onDark:focus-visible,
-.message-pulse:focus-visible {
+.message-pulse:focus-visible,
+.btn--primary:focus-visible,
+.iconbtn--brand:focus-visible,
+.toggle--on:focus-visible,
+.fab:focus-visible,
+.follow-btn:not(.follow-btn--on):focus-visible {
   outline-color: #FFFFFF;
 }
 

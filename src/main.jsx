@@ -5,6 +5,9 @@ import './styles/globals.css'
 /* Imported for its side effect: applies the saved theme attribute to <html>
    before the first render, so there's no flash of the wrong theme. */
 import './lib/theme.js'
+import { registerPWA } from './lib/pwa.js'
+
+registerPWA()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

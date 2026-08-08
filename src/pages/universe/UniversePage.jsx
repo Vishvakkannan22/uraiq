@@ -206,9 +206,20 @@ export default function UniversePage() {
         <p style={{ fontSize: 'var(--fs-13)', color: 'var(--text-4)', marginBottom: 'var(--s4)' }}>
           Runs on-device. Ask about anything in view.
         </p>
+        {/* TODO(milestone 2): no on-device assistant exists yet to answer
+            these — see agents.brief/notes/health in lib/api/index.js, all
+            currently backed by local heuristics, not a real model call.
+            Shown disabled rather than wired to a fake canned reply, which
+            would misrepresent what the assistant can actually do today. */}
         <div className="col" style={{ gap: 'var(--s2)' }}>
           {['Who am I overdue to reply to?', 'Summarise today across all chats', 'Which threads went quiet this week?'].map((p) => (
-            <button key={p} className="chip chip--ai" style={{ height: 42, justifyContent: 'flex-start', width: '100%' }}>
+            <button
+              key={p}
+              className="chip chip--ai"
+              style={{ height: 42, justifyContent: 'flex-start', width: '100%' }}
+              disabled
+              aria-label={`${p} — not available yet`}
+            >
               {p}
             </button>
           ))}

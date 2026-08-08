@@ -27,7 +27,7 @@ export default function LoginPage() {
     setError(null)
     try {
       await auth.login(email, password)
-      navigate('/home')
+      navigate('/welcome', { replace: true })
     } catch (err) {
       setError(err.message || 'Could not sign in')
       setBusy(false)

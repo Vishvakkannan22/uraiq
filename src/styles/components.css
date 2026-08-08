@@ -38,12 +38,35 @@
 
 /* ---------- Icon button ------------------------------------ */
 .iconbtn {
+  position: relative;
   display: inline-flex; align-items: center; justify-content: center;
   width: 40px; height: 40px; border-radius: var(--r-full);
   flex-shrink: 0; /* a squashed 40px hit target is worse than an overflow */
   color: var(--text-3);
   transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
               box-shadow var(--dur-2) var(--ease), transform var(--dur-1) var(--ease);
+}
+
+/* Touch targets reach 44px without the button *looking* 44px.
+   Growing the box itself would push every header, composer and toolbar in
+   the app taller — so instead an invisible pseudo-element centred on the
+   button extends the hit area outward, leaving the painted circle alone.
+   Scoped to coarse pointers: the 44px guidance exists because a fingertip
+   has no precision, and on a mouse the same rule would only create
+   invisible overlapping targets between neighbouring buttons.
+   `max()` means a control already at or above 44px is left untouched. */
+@media (pointer: coarse) {
+  .iconbtn::after,
+  .comment__like::after,
+  .comment__reply::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+  }
+  .comment__like, .comment__reply { position: relative; }
 }
 .iconbtn:hover { background: var(--hover); color: var(--text); }
 .iconbtn:active { transform: scale(0.92); }
@@ -346,59 +369,169 @@
   color: var(--text-4);
 }
 
-/* ---------- Nav rail (desktop) ----------------------------- */
+/* ---------- Nav rail (desktop) -------------------------------
+   A full-height glass panel that sits *next to* the chat list rather than
+   floating over the page. The earlier version was a vertically-centred
+   capsule with a fixed position, which left a dead band above and below it
+   and a visible gutter before the list — the rail read as an unrelated
+   object rather than the first column of the layout.
+
+   It is a flex child of AppShell again, so [rail][list][thread] is a real
+   row and no padding has to be reserved for it. The small margin plus a
+   large radius is what keeps the glass treatment without going back to a
+   flat edge-docked sidebar. */
 .rail {
-  width: var(--rail-w); flex-shrink: 0;
+  width: var(--rail-w);
+  flex-shrink: 0;
+  margin: var(--s2) 0 var(--s2) var(--s2);
   display: flex; flex-direction: column; align-items: center;
-  gap: var(--s1);
-  padding: var(--s5) 0 var(--s4);
+  gap: var(--s2);
+  padding: var(--s4) 0 var(--s3);
+  border-radius: var(--r-xl);
   background: var(--chrome-bg);
   backdrop-filter: var(--chrome-blur);
   -webkit-backdrop-filter: var(--chrome-blur);
-  box-shadow: inset -1px 0 0 var(--divider);
-  z-index: 1;
+  box-shadow: var(--e2), inset 0 0 0 1px var(--border);
+  /* Above AppShell's content column, which is also stacked (z-index: 1) and
+     comes later in the DOM — without this the hover tooltip renders correctly
+     but paints *behind* the chat list, which is the same as not rendering. */
+  z-index: 2;
 }
+.rail__brand {
+  display: grid; place-items: center;
+  padding-bottom: var(--s2);
+  filter: drop-shadow(0 4px 12px rgba(168, 85, 247, 0.35));
+}
+/* Bands of related destinations. The last one is pushed to the foot of the
+   column, which is what gives the rail its top-to-bottom rhythm: brand,
+   what you do, where you browse, who you are. */
+.rail__group {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+.rail__group--foot { margin-top: auto; }
+.rail__divider {
+  width: 28px; height: 1px;
+  margin: var(--s2) 0 var(--s3);
+  background: var(--divider);
+  flex-shrink: 0;
+}
+/* Positioning context for the tooltip, which must anchor to its own icon
+   rather than to the rail. */
+.rail__slot { position: relative; display: flex; justify-content: center; width: 100%; }
+
+/* Icon-only (the label lives in .rail__tooltip on hover/focus), so the hit
+   target is a plain rounded square rather than an icon+label stack. */
 .rail__item {
   position: relative;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px;
-  width: 60px; height: 54px;
+  display: flex; align-items: center; justify-content: center;
+  width: 46px; height: 46px;
   border-radius: var(--r-md);
   color: var(--text-4);
-  font-size: 10px; font-weight: 620;
-  transition: color var(--dur-1) var(--ease);
+  transition: color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
-.rail__item:hover { color: var(--text-2); }
+.rail__item:hover { color: var(--text-2); background: var(--hover); }
 .rail__item--active { color: var(--brand-700); }
+.rail__item--active:hover { background: transparent; }
 .rail__glow {
   position: absolute; inset: 0;
   border-radius: var(--r-md);
   background: var(--brand-100);
+  box-shadow: inset 0 0 0 1px var(--brand-200), 0 0 18px -2px rgba(168, 85, 247, 0.45);
 }
 .rail__item > * { position: relative; z-index: 1; }
+.rail__badge {
+  position: absolute; top: -5px; right: -7px;
+  height: 16px; min-width: 16px;
+  font-size: var(--fs-11);
+  border: 2px solid var(--chrome-bg);
+}
 
-/* ---------- Tab bar (mobile) ------------------------------- */
+/* The one always-brand-filled slot, matching the tab bar's centre dock so
+   the product's primary destination reads identically on both platforms.
+   Centred in its slot now rather than protruding sideways — a full-height
+   rail has a column to sit in, so there is nothing to lean out of. */
+.rail__dock {
+  position: relative;
+  display: grid; place-items: center;
+  width: 46px; height: 46px;
+  border-radius: var(--r-md);
+  background: var(--grad);
+  color: #fff;
+  box-shadow: var(--e-brand);
+}
+.rail__dockBadge {
+  position: absolute; top: -2px; right: -2px;
+  height: 18px; min-width: 18px; padding: 0 5px;
+  font-size: 10px;
+  border: 2px solid var(--chrome-bg);
+}
+
+/* Anchored to the item's own box (.rail__item is position:relative), not
+   the capsule — each tooltip opens from wherever its icon actually sits. */
+.rail__tooltip {
+  position: absolute;
+  left: calc(100% + var(--s3));
+  top: 50%;
+  white-space: nowrap;
+  padding: 7px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-solid);
+  color: var(--text);
+  font-size: var(--fs-13);
+  font-weight: 620;
+  box-shadow: var(--e3), inset 0 0 0 1px var(--border);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ---------- Tab bar (mobile) -------------------------------
+   A floating island, not an edge-docked bar: inset from both side
+   edges and lifted clear of the bottom safe area, with full elevation
+   in place of the old single top hairline. Every value here is a
+   token, so this re-skins per theme with zero extra rules — soft
+   dual-shadow "raised plastic" under neumorphism, a violet glow in
+   dark, an ordinary layered shadow by default. */
 .tabbar {
   position: relative; z-index: var(--z-tabbar);
   display: flex; align-items: stretch;
-  height: calc(var(--tabbar-h) + var(--safe-bottom));
-  padding-bottom: var(--safe-bottom);
+  margin: 0 var(--s4) calc(var(--tabbar-gap) + var(--safe-bottom));
+  padding: 5px;
+  height: var(--tabbar-h);
+  border-radius: var(--r-full);
   background: var(--chrome-bg);
   backdrop-filter: var(--chrome-blur);
   -webkit-backdrop-filter: var(--chrome-blur);
-  box-shadow: inset 0 1px 0 var(--divider);
+  box-shadow: var(--e3), inset 0 0 0 1px var(--border);
   flex-shrink: 0;
+  transition: box-shadow var(--dur-2) var(--ease);
 }
 .tabbar__item {
   position: relative; flex: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 3px;
+  border-radius: var(--r-full);
   color: var(--text-4);
   font-size: 10px; font-weight: 620;
-  transition: color var(--dur-1) var(--ease);
+  transition: color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
+/* Hover is a no-op on pure touch, but a floating island reads as
+   inert without it on anything with a pointer — a stylus-driven
+   tablet, a phone-width desktop browser. */
+.tabbar__item:hover { color: var(--text-2); background: var(--hover); }
 .tabbar__item--active { color: var(--brand-700); }
-.tabbar__item:active { transform: scale(0.94); }
+.tabbar__item--active:hover { background: transparent; }
+/* Press feedback for this item now comes from a framer-motion whileTap
+   spring in TabBar.jsx instead of a fixed-duration CSS transform — see the
+   note there for why. The centre dock already had its own whileTap and
+   never used this rule. */
+
+/* An unfinished message in the list. Brand-tinted rather than the row's
+   default grey, because a draft is a call to action — the one preview line
+   in the list that is about something *you* still have to do. */
+.draft-note { gap: 5px; color: var(--brand-600); font-weight: 560; min-width: 0; }
+.draft-note svg { flex-shrink: 0; }
 
 /* ---------- Thread surface --------------------------------- */
 .chat-focus {
@@ -411,6 +544,41 @@
   overflow: hidden;
   /* Transparent so the app backdrop reads through the thread. */
   background: transparent;
+}
+
+/* Each conversation picks up a faint wash in the peer's own avatar colour,
+   so threads are distinguishable at a glance without a label — you learn
+   "the green one is Priya" the same way you learn a room by its light.
+   --thread-tint is set inline by ChatThread; the fallback keeps this inert
+   for a conversation whose peer has no gradient yet. */
+.chat-focus::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 45%;
+  background: radial-gradient(
+    120% 100% at 50% 0%,
+    var(--thread-tint, transparent) 0%,
+    transparent 70%
+  );
+  opacity: 0.16;
+  pointer-events: none;
+}
+/* The wash is decorative and sits behind body text. */
+:root[data-contrast="high"] .chat-focus::before { display: none; }
+
+/* Scroll position through the thread, as a hairline on the trailing edge.
+   Deliberately not a scrollbar: it reports where you are in the
+   conversation, stays out of the way, and never becomes a drag target. */
+.thread-momentum {
+  position: absolute;
+  top: 0; bottom: 0; right: 2px;
+  width: 2px;
+  border-radius: var(--r-full);
+  background: var(--grad);
+  transform-origin: 50% 0;
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 /* ---------- Message bubbles --------------------------------
@@ -431,6 +599,8 @@
   font-size: var(--fs-15);
   line-height: 1.42;
   word-break: break-word;
+  /* For .bubble--lifted. Transform only — see that rule. */
+  transition: transform var(--dur-2) var(--ease);
 }
 .bubble--in {
   background: var(--surface);
@@ -542,15 +712,43 @@
   34%      { transform: scale(1.75); opacity: 0; }
 }
 
+/* A <button> now (it jumps to the quoted original), so it has to reset the
+   UA button defaults and take the full bubble width the old <span> had. */
 .bubble__quote {
   display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
   margin-bottom: 6px; padding: 5px 9px;
   border-radius: var(--r-xs);
+  border: none;
   border-left: 2.5px solid currentColor;
   font-size: var(--fs-13); line-height: 1.35;
+  cursor: pointer;
+  transition: filter var(--dur-1) var(--ease);
 }
+.bubble__quote:hover { filter: brightness(0.96); }
 .bubble--in .bubble__quote { background: var(--brand-50); color: var(--brand-800); }
 .bubble--out .bubble__quote { background: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.96); }
+
+/* Lands on the message a quote pointed at. After a scroll the eye cannot
+   tell which bubble was the target, so it pulses its own outline twice and
+   stops — a persistent highlight would then need dismissing. */
+.bubble--flash { animation: bubble-flash 1.4s var(--ease); }
+@keyframes bubble-flash {
+  0%, 100% { box-shadow: var(--e1), 0 0 0 0 rgba(168, 85, 247, 0); }
+  15%, 55% { box-shadow: var(--e2), 0 0 0 3px rgba(168, 85, 247, 0.55); }
+  35%, 75% { box-shadow: var(--e1), 0 0 0 0 rgba(168, 85, 247, 0.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Still needs to be findable without the pulse — a static ring for the same
+     duration, which the JS timer removes. */
+  .bubble--flash { animation: none; box-shadow: var(--e2), 0 0 0 3px rgba(168, 85, 247, 0.5); }
+}
+
+/* Detaches while its action bar is open. Transform only — animating the
+   shadow instead would repaint the bubble every frame. */
+.bubble--lifted { transform: scale(1.015); }
 
 .reaction {
   display: inline-flex; align-items: center; gap: 3px;
@@ -678,6 +876,7 @@
 }
 .chip:hover { box-shadow: var(--e2), inset 0 0 0 1px var(--border-strong); }
 .chip:active { transform: scale(0.95); }
+.chip:disabled { opacity: 0.55; cursor: not-allowed; pointer-events: none; }
 .chip--ai {
   background: var(--brand-50);
   color: var(--brand-800);
@@ -710,14 +909,21 @@
   box-shadow: var(--e2);
 }
 
-/* ---------- Toggle ----------------------------------------- */
+/* ---------- Toggle -----------------------------------------
+   A real <button role="switch">, so it gets the same hover/press
+   language as every other control here — it had neither before,
+   which made it the one interactive element in the app that felt
+   inert until the instant it changed state. */
 .toggle {
   position: relative; width: 46px; height: 28px; flex-shrink: 0;
   border-radius: var(--r-full);
   background: var(--n-300);
   transition: background-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
+.toggle:hover { background: var(--n-400); }
+.toggle:active { transform: scale(0.94); }
 .toggle--on { background: var(--grad); box-shadow: var(--e-brand); }
+.toggle--on:hover { box-shadow: var(--e-brand-lg); }
 .toggle__knob {
   position: absolute; top: 3px; left: 3px;
   width: 22px; height: 22px; border-radius: var(--r-full);
@@ -806,13 +1012,26 @@
   border-radius: var(--r-full);
   background: var(--grad);
   color: #fff;
-  box-shadow: var(--e-brand);
+  /* The second shadow is a ring in the bar's own chrome colour — reads as
+     a notch the dock sits in, rather than a circle floating in front of
+     the pill. */
+  box-shadow: var(--e-brand), 0 0 0 5px var(--chrome-bg);
+  cursor: pointer;
 }
 .tabbar__dockBadge {
   position: absolute; top: -2px; right: -2px;
   height: 18px; min-width: 18px; padding: 0 5px;
   font-size: 10px;
   border: 2px solid var(--chrome-bg);
+}
+/* The one-shot ring TabBar.jsx animates (opacity + scale) each time this
+   slot becomes active — sits behind the icon, in front of nothing that
+   matters, so a negative z-index keeps it from ever intercepting a tap. */
+.tabbar__dockPulse {
+  position: absolute; inset: -2px;
+  border-radius: var(--r-full);
+  background: var(--grad);
+  z-index: -1;
 }
 
 /* ---------- Home feed --------------------------------------
@@ -1199,6 +1418,7 @@
   color: var(--text-4);
 }
 .comment__reply:hover { color: var(--brand-700); }
+.comment__reply:disabled { opacity: 0.55; cursor: not-allowed; pointer-events: none; }
 .comment__like {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   flex-shrink: 0; padding-top: 4px;
@@ -1600,7 +1820,7 @@
 .toast {
   position: fixed;
   left: 50%; transform: translateX(-50%);
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--s4));
+  bottom: calc(var(--tabbar-h) + var(--tabbar-gap) + var(--safe-bottom) + var(--s4));
   z-index: var(--z-sheet);
   display: flex; align-items: center; gap: var(--s3);
   max-width: min(440px, calc(100vw - var(--s8)));
@@ -1637,14 +1857,14 @@
   margin-bottom: 2px;
   border-radius: var(--r-md);
 }
-.guard--warn { background: #FFF7ED; box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.22); }
+.guard--warn { background: var(--warning-bg); box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.22); }
 .guard--stop { background: var(--danger-bg); box-shadow: inset 0 0 0 1px rgba(225, 29, 72, 0.2); }
 .guard__head {
   display: flex; align-items: flex-start; gap: var(--s2);
   font-size: var(--fs-13); line-height: 1.45;
 }
-.guard--warn .guard__head { color: #92400E; }
-.guard--stop .guard__head { color: #9F1239; }
+.guard--warn .guard__head { color: var(--warning); }
+.guard--stop .guard__head { color: var(--danger); }
 .guard__head svg { margin-top: 1px; flex-shrink: 0; }
 .guard__alts { margin-top: var(--s3); }
 .guard__altsLabel {
@@ -1706,8 +1926,8 @@
   background: var(--success); color: #fff;
   flex-shrink: 0;
 }
-.standing__title { font-size: var(--fs-15); font-weight: 680; color: #065F46; }
-.standing__detail { font-size: var(--fs-12); color: #047857; margin-top: 2px; }
+.standing__title { font-size: var(--fs-15); font-weight: 680; color: var(--success); }
+.standing__detail { font-size: var(--fs-12); color: var(--success); margin-top: 2px; }
 
 /* ---------- Standards -------------------------------------- */
 .standard-card {
@@ -1795,7 +2015,7 @@
   font-size: var(--fs-11); font-weight: 660;
 }
 .trend--up { background: var(--success-bg); color: var(--success); }
-.trend--down { background: #FFF7ED; color: #B45309; }
+.trend--down { background: var(--warning-bg); color: var(--warning); }
 
 .moment {
   display: flex; align-items: flex-start; gap: var(--s3);
@@ -1819,12 +2039,12 @@
   margin: 0 var(--gutter) var(--s2);
   padding: var(--s3) var(--s4);
   border-radius: var(--r-md);
-  background: #FFF7ED;
+  background: var(--warning-bg);
   box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.22);
 }
 .cooldown__body { flex: 1 1 220px; min-width: 0; }
-.cooldown__body strong { display: block; font-size: var(--fs-14); color: #92400E; }
-.cooldown__body p { font-size: var(--fs-12); color: #B45309; line-height: 1.45; margin-top: 2px; }
+.cooldown__body strong { display: block; font-size: var(--fs-14); color: var(--warning); }
+.cooldown__body p { font-size: var(--fs-12); color: var(--warning); line-height: 1.45; margin-top: 2px; }
 
 /* ---------- Universe ----------------------------------------
    A second view onto the same chats, never a replacement for the
@@ -2030,6 +2250,540 @@
 
 .notice--error {
   background: var(--danger-bg);
-  color: #9F1239;
+  color: var(--danger);
   box-shadow: inset 0 0 0 1px rgba(225, 29, 72, 0.2);
+}
+
+/* ---------- UraiQ mobile chat direction ----------------------
+   The product now opens as a focused 1:1 messenger. These overrides keep the
+   existing components and behavior, but tune the visual system toward the
+   white, rounded, purple-accented mobile language in the reference. */
+body {
+  background:
+    radial-gradient(110% 70% at 50% -12%, rgba(233, 182, 255, 0.34), transparent 58%),
+    linear-gradient(180deg, #fbf8ff 0%, #f7f4ff 54%, #ffffff 100%);
+}
+
+.app-bg {
+  opacity: 0.42;
+}
+
+.bubble-3d {
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,.96), rgba(255,255,255,.38) 16%, transparent 35%),
+    radial-gradient(circle at 50% 50%, rgba(var(--hue), .12), rgba(var(--hue), .22) 62%, rgba(var(--hue), .28) 100%);
+  box-shadow:
+    inset -12px -16px 36px rgba(var(--hue), .18),
+    inset 10px 12px 30px rgba(255, 255, 255, .64),
+    0 26px 70px rgba(70, 44, 132, .08);
+}
+
+.chat-list-shell,
+.chat-focus {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.82)),
+    radial-gradient(90% 42% at 50% 0%, rgba(168, 85, 247, .10), transparent 70%);
+}
+
+.header {
+  margin: max(var(--safe-top), 0px) var(--s3) 0;
+  height: 64px;
+  padding: 0 var(--s2) 0 var(--s4);
+  border-radius: 0 0 var(--r-xl) var(--r-xl);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 10px 28px rgba(55, 36, 104, .07), inset 0 -1px 0 rgba(255, 255, 255, .74);
+}
+
+.header--scrolled {
+  height: 56px;
+  box-shadow: 0 12px 32px rgba(55, 36, 104, .10), inset 0 0 0 1px rgba(126, 34, 206, .08);
+}
+
+.header__title {
+  font-size: var(--fs-20);
+  font-weight: 780;
+}
+
+.header__sub {
+  color: var(--text-4);
+  font-weight: 560;
+}
+
+.iconbtn {
+  background: rgba(255,255,255,.58);
+  box-shadow: inset 0 0 0 1px rgba(76, 61, 130, .06);
+}
+
+.iconbtn:hover {
+  background: var(--surface);
+  box-shadow: var(--e1), inset 0 0 0 1px rgba(126, 34, 206, .12);
+}
+
+.search {
+  height: 46px;
+  background: #f1eef7;
+  box-shadow: inset 0 0 0 1px rgba(76, 61, 130, .04);
+}
+
+.search:focus-within {
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(55, 36, 104, .08), inset 0 0 0 1.5px var(--brand-300);
+}
+
+.row-item {
+  margin: 0 var(--s1) var(--s2);
+  padding: 13px 12px;
+  border-radius: 22px;
+  background: rgba(255,255,255,.68);
+  box-shadow: inset 0 0 0 1px rgba(76, 61, 130, .055);
+}
+
+.row-item:hover {
+  background: #fff;
+  box-shadow: var(--e2), inset 0 0 0 1px rgba(126, 34, 206, .10);
+}
+
+.row-item--active,
+.row-item--active:hover {
+  background: linear-gradient(135deg, #fff 0%, #faf5ff 100%);
+  box-shadow: 0 12px 28px rgba(126, 34, 206, .10), inset 0 0 0 1.5px var(--brand-200);
+}
+
+.row-item--active::before {
+  left: auto;
+  right: 10px;
+  top: 50%;
+  bottom: auto;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 5px rgba(168, 85, 247, .12);
+}
+
+.section-label {
+  padding: var(--s4) var(--s4) var(--s2);
+  letter-spacing: 0.04em;
+}
+
+.tabbar {
+  margin: 0 var(--s5) calc(var(--tabbar-gap) + var(--safe-bottom));
+  height: 68px;
+  padding: 6px;
+  background: rgba(255,255,255,.86);
+  box-shadow: 0 18px 44px rgba(54, 34, 112, .16), inset 0 0 0 1px rgba(126, 34, 206, .10);
+}
+
+.tabbar__item {
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.tabbar__dock {
+  width: 52px;
+  height: 52px;
+  box-shadow: 0 14px 30px rgba(126, 34, 206, .32), inset 0 0 0 1px rgba(255,255,255,.30);
+}
+
+.chat-focus::before {
+  height: 52%;
+  opacity: .11;
+}
+
+.bubble {
+  padding: 10px 13px;
+  border-radius: 22px;
+  line-height: 1.46;
+}
+
+.bubble--in {
+  background: rgba(255,255,255,.92);
+  border-bottom-left-radius: 8px;
+  box-shadow: 0 6px 18px rgba(47, 32, 89, .06), inset 0 0 0 1px rgba(76, 61, 130, .06);
+}
+
+.bubble--out {
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 56%, #5b5ee8 100%);
+  border-bottom-right-radius: 8px;
+  box-shadow: 0 12px 26px rgba(126, 34, 206, .26);
+}
+
+.ai-reply-tray {
+  padding: var(--s2) var(--gutter) var(--s2);
+  background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.74));
+}
+
+.composer {
+  margin: 0 var(--s3);
+  padding: var(--s2);
+  padding-bottom: calc(var(--s2) + var(--safe-bottom));
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  background: rgba(255,255,255,.86);
+  box-shadow: 0 -16px 36px rgba(55, 36, 104, .10), inset 0 1px 0 rgba(255,255,255,.78);
+}
+
+.composer__input {
+  min-height: 48px;
+  border-radius: 24px;
+  background: #f2eef8;
+}
+
+.composer__input:focus-within {
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(55, 36, 104, .08), inset 0 0 0 1.5px var(--brand-300);
+}
+
+.jump-latest {
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 14px 32px rgba(55, 36, 104, .14), inset 0 0 0 1px rgba(126, 34, 206, .10);
+  color: var(--brand-700);
+}
+
+@media (max-width: 767px) {
+  :root {
+    --gutter: 14px;
+    --row-pad: 10px;
+    --tabbar-gap: 10px;
+  }
+
+  .chat-list-shell .scroll {
+    padding-bottom: calc(var(--tabbar-h) + var(--tabbar-gap) + var(--safe-bottom) + var(--s5)) !important;
+  }
+
+  .chat-focus > .scroll {
+    padding-inline: var(--s4) !important;
+  }
+
+  .message-pulse__label,
+  .message-pulse__time {
+    display: none;
+  }
+}
+
+/* ---------- Reference mobile product frame -------------------
+   Stronger than the earlier polish pass: this replaces the old desktop/social
+   feel with a light mobile app frame based on the user's reference. */
+:root[data-theme="dark"] {
+  color-scheme: light;
+  --n-0: #FFFFFF;
+  --n-25: #FDFCFE;
+  --n-50: #F9F7FC;
+  --n-100: #F4F1F9;
+  --n-150: #EDE9F4;
+  --n-200: #E4DFEE;
+  --n-300: #D0C9E0;
+  --n-400: #A9A0C0;
+  --n-500: #8B82A4;
+  --n-600: #6B5F98;
+  --n-700: #4C3D82;
+  --n-800: #33246B;
+  --n-900: #1E1157;
+  --text: var(--n-900);
+  --text-2: var(--n-800);
+  --text-3: var(--n-700);
+  --text-4: var(--n-600);
+  --bg: #F7F5FC;
+  --pane: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-2: #FDFCFE;
+  --surface-solid: #FFFFFF;
+  --chrome-bg: rgba(255, 255, 255, 0.84);
+  --border: rgba(27, 20, 48, 0.07);
+  --border-strong: rgba(27, 20, 48, 0.13);
+  --divider: rgba(27, 20, 48, 0.07);
+  --track: #F0ECF8;
+  --hover: rgba(27, 20, 48, 0.04);
+  --pressed: rgba(27, 20, 48, 0.07);
+  --brand-50: #FAF5FF;
+  --brand-100: #F3E8FF;
+  --brand-200: #E9D5FF;
+  --brand-300: #D8B4FE;
+  --brand-700: #7E22CE;
+  --brand-800: #6B21A8;
+  --e1: 0 1px 2px rgba(27, 20, 48, 0.05);
+  --e2: 0 4px 12px rgba(27, 20, 48, 0.07), 0 1px 2px rgba(27, 20, 48, 0.04);
+  --e3: 0 12px 28px rgba(27, 20, 48, 0.10), 0 2px 6px rgba(27, 20, 48, 0.05);
+  --e4: 0 24px 56px rgba(27, 20, 48, 0.16), 0 4px 12px rgba(27, 20, 48, 0.06);
+}
+
+.app-shell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  padding: clamp(12px, 3vw, 28px);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(124, 58, 237, .22), transparent 25%),
+    radial-gradient(circle at 84% 12%, rgba(217, 70, 239, .18), transparent 24%),
+    linear-gradient(135deg, #efe9ff 0%, #e9f6ff 45%, #fff5fb 100%);
+}
+
+.app-shell__phone {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 430px);
+  height: min(100%, 880px);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 34px;
+  background: rgba(255,255,255,.80);
+  box-shadow:
+    0 34px 90px rgba(51, 36, 107, .20),
+    0 0 0 1px rgba(255,255,255,.72),
+    inset 0 0 0 1px rgba(126, 34, 206, .08);
+}
+
+.chat-stack {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.chat-stack__screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.inbox-hero {
+  position: relative;
+  overflow: hidden;
+  margin: var(--s1) var(--s1) var(--s4);
+  padding: var(--s4);
+  min-height: 154px;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 85% 18%, rgba(255,255,255,.36), transparent 28%),
+    linear-gradient(135deg, #8b5cf6 0%, #7c3aed 56%, #a855f7 100%);
+  color: #fff;
+  box-shadow: 0 18px 42px rgba(126, 34, 206, .28);
+}
+
+.inbox-hero::after {
+  content: '';
+  position: absolute;
+  right: -38px;
+  bottom: -52px;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.16);
+  box-shadow: -70px -38px 0 rgba(255,255,255,.08);
+}
+
+.inbox-hero__top,
+.inbox-hero__stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.inbox-hero__eyebrow,
+.inbox-hero__action,
+.inbox-hero__stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-full);
+  background: rgba(255,255,255,.16);
+  color: rgba(255,255,255,.94);
+  font-size: var(--fs-11);
+  font-weight: 720;
+}
+
+.inbox-hero__action {
+  background: rgba(18, 12, 38, .78);
+  color: #fff;
+}
+
+.inbox-hero h2 {
+  position: relative;
+  z-index: 1;
+  margin-top: var(--s5);
+  max-width: 240px;
+  color: #fff;
+  font-size: var(--fs-24);
+  font-weight: 830;
+  letter-spacing: 0;
+}
+
+.inbox-hero p {
+  position: relative;
+  z-index: 1;
+  max-width: 270px;
+  margin-top: var(--s2);
+  color: rgba(255,255,255,.82);
+  font-size: var(--fs-13);
+  line-height: 1.45;
+}
+
+.inbox-hero__stats {
+  justify-content: flex-start;
+  margin-top: var(--s4);
+}
+
+.inbox-hero__stats span {
+  background: rgba(255,255,255,.20);
+}
+
+.calls-page,
+.find-page,
+.new-chat-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.82)),
+    radial-gradient(80% 34% at 50% 0%, rgba(168, 85, 247, .09), transparent 72%);
+}
+
+.compose-card {
+  position: relative;
+  overflow: hidden;
+  margin: var(--s1) 0 var(--s4);
+  padding: var(--s4);
+  border-radius: 24px;
+  background: rgba(255,255,255,.78);
+  box-shadow: 0 14px 34px rgba(55, 36, 104, .08), inset 0 0 0 1px rgba(76, 61, 130, .07);
+}
+
+.compose-card::after {
+  content: '';
+  position: absolute;
+  right: -32px;
+  top: -38px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: var(--grad-wash);
+}
+
+.compose-card__icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: var(--grad);
+  color: #fff;
+  box-shadow: var(--e-brand);
+}
+
+.compose-card h2,
+.compose-card p {
+  position: relative;
+  z-index: 1;
+}
+
+.compose-card h2 {
+  margin-top: var(--s4);
+  font-size: var(--fs-20);
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.compose-card p {
+  max-width: 290px;
+  margin-top: var(--s2);
+  color: var(--text-4);
+  font-size: var(--fs-13);
+  line-height: 1.45;
+}
+
+.compose-card--calls {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(255,255,255,.34), transparent 30%),
+    linear-gradient(135deg, #fff 0%, #f7f2ff 100%);
+}
+
+.new-chat-search {
+  margin-top: var(--s3);
+}
+
+.call-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-top: var(--s4);
+}
+
+.call-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 12px;
+  border-radius: 22px;
+  background: rgba(255,255,255,.74);
+  box-shadow: inset 0 0 0 1px rgba(76, 61, 130, .055);
+}
+
+.call-row__name {
+  color: var(--text);
+  font-size: var(--fs-15);
+  font-weight: 720;
+}
+
+.call-row__meta {
+  margin-top: 1px;
+  color: var(--text-4);
+  font-size: var(--fs-12);
+}
+
+.call-row .iconbtn {
+  width: 36px;
+  height: 36px;
+}
+
+.call-row .iconbtn--brand {
+  color: #fff;
+}
+
+@media (min-width: 768px) {
+  .app-bg {
+    opacity: .30;
+  }
+
+  .app-shell__phone::before {
+    content: '';
+    position: absolute;
+    inset: 10px 42% auto;
+    height: 4px;
+    border-radius: var(--r-full);
+    background: rgba(76, 61, 130, .16);
+    z-index: 3;
+  }
+
+  .tabbar {
+    margin-inline: var(--s5);
+  }
+}
+
+@media (max-width: 520px) {
+  .app-shell {
+    display: flex;
+    padding: 0;
+    background: var(--bg);
+  }
+
+  .app-shell__phone {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }

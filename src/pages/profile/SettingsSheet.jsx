@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Bell, Check, ChevronLeft, ChevronRight, FileText, Ghost, HardDrive, Loader2,
+  Accessibility, Bell, Check, ChevronLeft, ChevronRight, FileText, Ghost, HardDrive, Loader2,
   Lock, LogOut, Palette, QrCode, ScanEye, ShieldCheck, ShieldOff, Timer,
   Trash2, UserPen,
 } from 'lucide-react'
@@ -14,11 +14,56 @@ import { ease, springPop } from '../../lib/motion'
 import { STANDARDS, standing } from '../../lib/moderation'
 import { auth } from '../../lib/api'
 import { useTheme } from '../../lib/theme'
+import { useA11y } from '../../lib/a11y'
 import { blockedUsers, notificationPrefs, storageBreakdown } from '../../data/mockData'
 
 const APPEARANCES = [
   { id: 'default', label: 'Default', blurb: 'The standard UraiQ look — flat surfaces, layered shadow.' },
   { id: 'neumorphism', label: 'Neumorphism', blurb: 'Soft, extruded surfaces that look pressed from the same material.' },
+  { id: 'dark', label: 'Dark', blurb: 'Near-black surfaces with a neon-violet accent.' },
+]
+
+/* Each group maps one preference in lib/a11y.js to a row of options. Kept as
+   data rather than repeated markup so adding a preference is one entry here
+   plus its token block in styles/a11y.css. */
+const A11Y_GROUPS = [
+  {
+    key: 'textSize',
+    label: 'Text size',
+    blurb: 'Scales every size in the app. Layout spacing stays put, so text gets bigger rather than everything getting further apart.',
+    options: [
+      { id: 'default', label: 'Default' },
+      { id: 'large', label: 'Large' },
+      { id: 'larger', label: 'Larger' },
+    ],
+  },
+  {
+    key: 'contrast',
+    label: 'Contrast',
+    blurb: 'Darkens secondary text, turns hairline borders into real lines, and hides the decorative background behind content.',
+    options: [
+      { id: 'normal', label: 'Normal' },
+      { id: 'high', label: 'High' },
+    ],
+  },
+  {
+    key: 'typeface',
+    label: 'Typeface',
+    blurb: 'Readable uses a screen-legibility face with wider letter, word and line spacing. It is not OpenDyslexic — that needs a font file this build does not ship.',
+    options: [
+      { id: 'default', label: 'Default' },
+      { id: 'readable', label: 'Readable' },
+    ],
+  },
+  {
+    key: 'transparency',
+    label: 'Transparency',
+    blurb: 'Reduced makes the frosted bars solid and drops the background blur. Also cheaper to render on an older device.',
+    options: [
+      { id: 'normal', label: 'Normal' },
+      { id: 'reduced', label: 'Reduced' },
+    ],
+  },
 ]
 
 const FILTER_LEVELS = [
@@ -112,6 +157,7 @@ export default function SettingsSheet({ open, onClose, desktop, user, onSaveProf
   const [panel, setPanel] = useState(initialPanel)
   const [filterLevel, setFilterLevel] = useState('standard')
   const [appearance, setAppearance] = useTheme()
+  const [a11y, setA11y] = useA11y()
 
   /* A local draft, separate from the committed `user` — typing updates this on
      every keystroke, but nothing reaches the server (or the shared session
@@ -160,6 +206,11 @@ export default function SettingsSheet({ open, onClose, desktop, user, onSaveProf
   const [blocked, setBlocked] = useState(blockedUsers)
   const [cleared, setCleared] = useState([])
 
+  /* Surfaced on the root row so someone can tell at a glance that something
+     is on — otherwise a preference set once is invisible until you open the
+     panel and read four separate rows. */
+  const activeA11yCount = A11Y_GROUPS.filter((g) => a11y[g.key] !== g.options[0].id).length
+
   const back = () => setPanel('root')
   const totalMb = storageBreakdown
     .filter((s) => !cleared.includes(s.id))
@@ -185,6 +236,13 @@ export default function SettingsSheet({ open, onClose, desktop, user, onSaveProf
                 body="Switch the app's visual style"
                 value={APPEARANCES.find((a) => a.id === appearance)?.label}
                 onClick={() => setPanel('appearance')}
+              />
+              <Row
+                icon={Accessibility}
+                title="Accessibility"
+                body="Text size, contrast, typeface, transparency"
+                value={activeA11yCount > 0 ? `${activeA11yCount} on` : undefined}
+                onClick={() => setPanel('a11y')}
               />
               <Row icon={ShieldCheck} title="Safety & moderation" body="How conversations are kept respectful" value={standing.label} onClick={() => setPanel('safety')} />
               <Row icon={Bell} title="Notifications" body="What reaches you, and when" onClick={() => setPanel('notifications')} />
@@ -295,6 +353,51 @@ export default function SettingsSheet({ open, onClose, desktop, user, onSaveProf
                   )}
                 </button>
               ))}
+            </div>
+          </Panel>
+        )}
+
+        {panel === 'a11y' && (
+          <Panel key="a11y" title="Accessibility" onBack={back}>
+            <p style={{ fontSize: 'var(--fs-13)', color: 'var(--text-4)', marginBottom: 'var(--s5)', lineHeight: 1.5 }}>
+              Applies instantly, on this device only. These combine with each other and with
+              whichever appearance you've picked.
+            </p>
+
+            <div className="col" style={{ gap: 'var(--s6)' }}>
+              {A11Y_GROUPS.map((group) => (
+                <div key={group.key}>
+                  <div className="set-label" style={{ marginTop: 0 }}>{group.label}</div>
+                  {/* radiogroup, not a row of buttons: these are one-of-N and a
+                      screen reader should hear "2 of 3", not four unrelated
+                      toggles. */}
+                  <div className="row" style={{ gap: 6, flexWrap: 'wrap' }} role="radiogroup" aria-label={group.label}>
+                    {group.options.map((opt) => (
+                      <button
+                        key={opt.id}
+                        role="radio"
+                        aria-checked={a11y[group.key] === opt.id}
+                        className={`chip ${a11y[group.key] === opt.id ? 'chip--ai' : ''}`}
+                        onClick={() => setA11y(group.key, opt.id)}
+                      >
+                        {a11y[group.key] === opt.id && <Check size={13} strokeWidth={3.2} />}
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p style={{ fontSize: 'var(--fs-12)', color: 'var(--text-4)', marginTop: 'var(--s2)', lineHeight: 1.5 }}>
+                    {group.blurb}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="notice notice--info" style={{ marginTop: 'var(--s6)' }}>
+              <Accessibility size={14} />
+              <span>
+                Reduced motion follows your system setting — turn it on in your OS and UraiQ
+                drops animation everywhere automatically. There's nothing to switch here.
+              </span>
             </div>
           </Panel>
         )}

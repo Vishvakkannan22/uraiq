@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { chatsApi } from './api'
 import { onConversationChanged, onInboxMessage } from './events'
+import { useAuth } from './auth'
 
 /**
  * GET /conversations, with the four states a real network actually has:
@@ -11,10 +12,12 @@ import { onConversationChanged, onInboxMessage } from './events'
  * empty-state panel that flashes on every mount.
  */
 export function useConversations() {
+  const { token } = useAuth()
   const [conversations, setConversations] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const alive = useRef(true)
+  const requestId = useRef(0)
 
   /**
    * Set to true on every run, not just at declaration.
@@ -34,19 +37,33 @@ export function useConversations() {
   }, [])
 
   const load = useCallback(async () => {
+    const id = ++requestId.current
+    if (!token) {
+      setConversations(null)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     setError(null)
     try {
       const data = await chatsApi.list()
-      if (!alive.current) return
-      setConversations(data?.conversations ?? [])
+      if (!alive.current || id !== requestId.current) return
+      const nextConversations = data?.conversations
+      if (!Array.isArray(nextConversations)) {
+        throw new Error('The server returned an invalid conversations response.')
+      }
+      if (nextConversations.some((conversation) => !conversation?.id || !conversation.peer?.id)) {
+        throw new Error('The server returned an incomplete conversation.')
+      }
+      setConversations(nextConversations)
     } catch (err) {
-      if (!alive.current) return
+      if (!alive.current || id !== requestId.current || err.code === 'aborted') return
       setError(err)
     } finally {
-      if (alive.current) setLoading(false)
+      if (alive.current && id === requestId.current) setLoading(false)
     }
-  }, [])
+  }, [token])
 
   useEffect(() => {
     load()

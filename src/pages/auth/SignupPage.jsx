@@ -24,7 +24,7 @@ export default function SignupPage() {
     setError(null)
     try {
       await auth.signup(form)
-      navigate('/home')
+      navigate('/welcome', { replace: true })
     } catch (err) {
       setError(err.message || 'Could not create the account')
       setBusy(false)

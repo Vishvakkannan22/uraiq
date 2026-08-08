@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { NavLink } from 'react-router-dom'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Archive, ArchiveRestore, ArrowDownAZ, ArrowLeftRight, BellOff, Bell, Check,
-  Clock, CloudOff, Lock, MailOpen, MessagesSquare, Orbit, Pin,
+  Clock, CloudOff, Lock, MailOpen, MessagesSquare, Pencil, Pin,
   Search, SlidersHorizontal, SquarePen, Users, X,
 } from 'lucide-react'
 import Header from '../../layout/Header'
@@ -13,11 +13,12 @@ import SwipeRow from '../../components/ui/SwipeRow'
 import Sheet from '../../components/ui/Sheet'
 import NewChatSheet from './NewChatSheet'
 import { SkeletonRow } from '../../components/ui/Skeleton'
-import { listItem, listStagger } from '../../lib/motion'
+import { listItem, listStagger, spring } from '../../lib/motion'
 import { useIsDesktop } from '../../lib/useMediaQuery'
 import { healthOf } from '../../lib/conversationHealth'
 import { useScrolled } from '../../lib/useScrolled'
 import { useChatList } from '../../lib/chat/useChatList'
+import { useDrafts } from '../../lib/drafts'
 import { useClockTick } from '../../lib/useClockTick'
 import { listTimeLabel } from '../../lib/time'
 
@@ -59,11 +60,12 @@ const SORTS = [
 const FILTERS = [
   { id: 'all', label: 'All chats' },
   { id: 'unread', label: 'Unread' },
-  { id: 'groups', label: 'Groups' },
   { id: 'muted', label: 'Muted' },
 ]
 
-function ChatRow({ chat, muted, archived, onArchive, onMute }) {
+function ChatRow({ chat, muted, archived, onArchive, onMute, draft }) {
+  const isDesktop = useIsDesktop()
+  const reduced = useReducedMotion()
   return (
     <motion.div variants={listItem}>
     <SwipeRow
@@ -91,12 +93,20 @@ function ChatRow({ chat, muted, archived, onArchive, onMute }) {
     <NavLink to={`/chats/${chat.id}`} style={{ display: 'block' }}>
       {({ isActive }) => (
         <div className={`row-item ${isActive ? 'row-item--active' : ''}`}>
-          <Avatar
-            initials={chat.initials}
-            gradient={chat.gradient}
-            size={46}
-            status={chat.online ? 'online' : undefined}
-          />
+          {/* Shared with the header avatar in ChatThread via the same
+              layoutId — see the note there for why this is mobile-only. */}
+          <motion.span
+            layoutId={!isDesktop ? `chat-avatar-${chat.id}` : undefined}
+            transition={reduced ? { duration: 0 } : spring}
+            style={{ display: 'inline-flex', flexShrink: 0 }}
+          >
+            <Avatar
+              initials={chat.initials}
+              gradient={chat.gradient}
+              size={46}
+              status={chat.online ? 'online' : undefined}
+            />
+          </motion.span>
 
           <div className="grow col" style={{ gap: 2 }}>
             <div className="row" style={{ gap: 6 }}>
@@ -124,12 +134,22 @@ function ChatRow({ chat, muted, archived, onArchive, onMute }) {
             </div>
 
             <div className="row" style={{ gap: 5, fontSize: 'var(--fs-13)', color: 'var(--text-4)' }}>
-              {chat.outgoing && !chat.typing && (
+              {/* Delivery pulse belongs to the last *sent* message. A draft is
+                  unsent by definition, so it replaces the pulse rather than
+                  sitting beside it and implying the draft has a status. */}
+              {chat.outgoing && !chat.typing && !draft && (
                 <MiniPulse status={chat.read ? 'seen' : chat.delivered ? 'received' : 'sending'} />
               )}
               <span className="truncate grow">
+                {/* Precedence: what they're doing now (typing) beats what you
+                    left unfinished, which beats the last message. */}
                 {chat.typing ? (
                   <TypingPreview />
+                ) : draft ? (
+                  <span className="row draft-note">
+                    <Pencil size={12} />
+                    <span className="truncate">{draft}</span>
+                  </span>
                 ) : (
                   <>
                     {chat.author && <span style={{ color: 'var(--text-3)' }}>{chat.author}: </span>}
@@ -156,6 +176,7 @@ function ChatRow({ chat, muted, archived, onArchive, onMute }) {
 export default function ChatListPane({ onResetWidth, canResetWidth }) {
   const isDesktop = useIsDesktop()
   const { chats, loading, error, retry } = useChatList()
+  const drafts = useDrafts()
   /* Nothing else re-renders this list on a timer, so without this a row's
      "2m ago" would freeze until an unrelated event (a new message anywhere,
      a refetch) happened to redraw it. */
@@ -209,7 +230,6 @@ export default function ChatListPane({ onResetWidth, canResetWidth }) {
      is a no-op and the other sorts work from that same baseline. */
   const byFilter = filtered.filter((c) => {
     if (filter === 'unread') return c.unread > 0
-    if (filter === 'groups') return Boolean(c.group)
     if (filter === 'muted') return isMuted(c)
     return true
   })
@@ -232,12 +252,14 @@ export default function ChatListPane({ onResetWidth, canResetWidth }) {
     archived: isArchived(c),
     onArchive: toggleArchive,
     onMute,
+    draft: drafts[c.id],
   })
 
   return (
     <div className="chat-list-shell">
       <Header
-        title="Chats"
+        title="Messages"
+        subtitle="Private 1:1 conversations"
         scrolled={scrolled}
         actions={
           <>
@@ -252,9 +274,6 @@ export default function ChatListPane({ onResetWidth, canResetWidth }) {
                 <Archive size={19} />
               </button>
             )}
-            <Link to="/universe" className="iconbtn" aria-label="Universe view" title="Universe view">
-              <Orbit size={19} />
-            </Link>
             <button
               className="iconbtn"
               onClick={() => setAdjustOpen(true)}
@@ -291,6 +310,26 @@ export default function ChatListPane({ onResetWidth, canResetWidth }) {
             </AnimatePresence>
           </div>
         </div>
+
+        {!query && !showArchived && filter === 'all' && (
+          <section className="inbox-hero" aria-label="UraiQ Direct">
+            <div className="inbox-hero__top">
+              <span className="inbox-hero__eyebrow">
+                <Lock size={13} />
+                Private space
+              </span>
+              <button className="inbox-hero__action" onClick={() => setNewChatOpen(true)}>
+                New chat
+              </button>
+            </div>
+            <h2>UraiQ Direct</h2>
+            <p>Calm, intelligent 1:1 messaging with safety checks before delivery.</p>
+            <div className="inbox-hero__stats" aria-hidden>
+              <span>{inbox.length} active</span>
+              <span>{inbox.filter((c) => c.unread > 0).length} unread</span>
+            </div>
+          </section>
+        )}
 
         {(filter !== 'all' || sort !== 'recent') && (
           <div className="row" style={{ gap: 6, padding: '0 var(--row-pad) var(--s3)', flexWrap: 'wrap' }}>

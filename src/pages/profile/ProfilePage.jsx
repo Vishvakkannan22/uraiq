@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Bell, MessagesSquare, QrCode, Settings, Share2 } from 'lucide-react'
 import Header from '../../layout/Header'
@@ -31,6 +31,19 @@ export default function ProfilePage() {
     setSettingsPanel(panel)
     setSettingsOpen(true)
   }
+
+  /* The rail's Settings item routes here carrying `openSettings` in router
+     state, because the sheet is a panel of this screen and has no URL of its
+     own. The state is cleared immediately after use — otherwise going back to
+     this screen later, or reloading it, would re-open a sheet the user had
+     already dismissed. */
+  const location = useLocation()
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!location.state?.openSettings) return
+    openSettings('root')
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.state, location.pathname, navigate])
 
   /**
    * Persists via PATCH /users/me, then writes the response into the shared

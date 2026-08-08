@@ -2,14 +2,15 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AnimatePresence } from 'framer-motion'
 import AppShell from './layout/AppShell'
 import RequireAuth from './layout/RequireAuth'
+import WelcomePage from './pages/auth/WelcomePage'
 import LoginPage from './pages/auth/LoginPage'
 import SignupPage from './pages/auth/SignupPage'
-import HomeFeed from './pages/home/HomeFeed'
-import ReelsPage from './pages/reels/ReelsPage'
 import SearchPage from './pages/search/SearchPage'
 import UniversePage from './pages/universe/UniversePage'
 import ChatsLayout from './pages/chats/ChatsLayout'
 import ChatThread, { NoChatSelected } from './pages/chats/ChatThread'
+import NewChatPage from './pages/chats/NewChatPage'
+import CallsPage from './pages/calls/CallsPage'
 import StoryViewer from './pages/discover/StoryViewer'
 import CommunitiesPage from './pages/communities/CommunitiesPage'
 import NotificationsPage from './pages/notifications/NotificationsPage'
@@ -24,18 +25,20 @@ function Router() {
   return (
     <>
       <Routes location={background || location}>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<WelcomePage />} />
+        <Route path="/welcome" element={<WelcomePage afterSignIn />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
 
         <Route element={<RequireAuth><AppShell /></RequireAuth>}>
-          {/* Primary tabs, in bar order: Home, Reels, Messages, Search, You. */}
-          <Route path="/home" element={<HomeFeed />} />
-          <Route path="/reels" element={<ReelsPage />} />
+          <Route path="/home" element={<Navigate to="/chats" replace />} />
+          <Route path="/reels" element={<Navigate to="/calls" replace />} />
           <Route path="/chats" element={<ChatsLayout />}>
             <Route index element={<NoChatSelected />} />
             <Route path=":chatId" element={<ChatThread />} />
           </Route>
+          <Route path="/new" element={<NewChatPage />} />
+          <Route path="/calls" element={<CallsPage />} />
           <Route path="/search" element={<SearchPage />} />
           {/* A second way to see the same chats — the list stays the default. */}
           <Route path="/universe" element={<UniversePage />} />
@@ -48,7 +51,7 @@ function Router() {
 
         {/* Direct visit to a story URL — renders on its own. */}
         <Route path="/stories/:storyId" element={<StoryViewer />} />
-        <Route path="*" element={<Navigate to="/home" replace />} />
+        <Route path="*" element={<Navigate to="/chats" replace />} />
       </Routes>
 
       <AnimatePresence>

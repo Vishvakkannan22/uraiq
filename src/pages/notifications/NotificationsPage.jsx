@@ -91,7 +91,7 @@ export default function NotificationsPage() {
                     </div>
                     <div className="row" style={{ gap: 6, marginTop: 3 }}>
                       <span style={{ fontSize: 'var(--fs-11)', color: 'var(--text-4)' }}>{n.time}</span>
-                      {n.ai && <span className="pill" style={{ height: 19, fontSize: 10, background: 'var(--brand-100)', color: 'var(--brand-700)' }}>UraiQ</span>}
+                      {n.ai && <span className="pill" style={{ height: 19, fontSize: 'var(--fs-11)', background: 'var(--brand-100)', color: 'var(--brand-700)' }}>UraiQ</span>}
                     </div>
                   </div>
 

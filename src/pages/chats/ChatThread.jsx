@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   ChevronDown, ChevronLeft, CloudOff, Eraser, Flag, Loader2, Lock, MessagesSquare,
   MoreVertical, Phone, Pin, Search, CalendarClock, CheckCircle2, Circle, ShieldCheck,
@@ -9,6 +9,7 @@ import {
 import Header from '../../layout/Header'
 import Avatar from '../../components/ui/Avatar'
 import StatePanel from '../../components/ui/StatePanel'
+import LiveRegion from '../../components/ui/LiveRegion'
 import Sheet from '../../components/ui/Sheet'
 import ShareSheet from '../../components/ui/ShareSheet'
 import ReportSheet from '../../components/ui/ReportSheet'
@@ -18,10 +19,11 @@ import { SkeletonBubble } from '../../components/ui/Skeleton'
 import MessageBubble, { DateDivider, TypingBubble } from './MessageBubble'
 import Composer from './Composer'
 import { useIsDesktop } from '../../lib/useMediaQuery'
-import { ease, springSnap } from '../../lib/motion'
+import { ease, spring, springSnap } from '../../lib/motion'
 import { COOLDOWN, COOLDOWN_THRESHOLD, healthOf } from '../../lib/conversationHealth'
 import { notesFor, resumeFor } from '../../lib/assistant'
 import { useThread } from '../../lib/chat/useThread'
+import { useThreadAnnouncer } from '../../lib/useThreadAnnouncer'
 import { lastSeenLabel } from '../../lib/time'
 import { useClockTick } from '../../lib/useClockTick'
 import { smartRepliesByChat } from '../../data/mockData'
@@ -37,6 +39,7 @@ export default function ChatThread() {
   const { chatId } = useParams()
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
+  const reduced = useReducedMotion()
 
   const {
     chat, messages, loading, error, notFound, connection,
@@ -48,6 +51,10 @@ export default function ChatThread() {
      during the last message/typing/presence event, silently going stale
      between them. */
   useClockTick()
+
+  /* Called before the loading/not-found early returns below, so the hook order
+     stays stable across every render this component can produce. */
+  const announcement = useThreadAnnouncer({ messages, loading, connection, conversationId: chatId })
 
   const [replyTo, setReplyTo] = useState(null)
   const [activeMsg, setActiveMsg] = useState(null)
@@ -61,6 +68,8 @@ export default function ChatThread() {
   const [starred, setStarred] = useState(() => new Set())
   const [starredOpen, setStarredOpen] = useState(false)
   const [atBottom, setAtBottom] = useState(true)
+  const [flashId, setFlashId] = useState(null)
+  const [progress, setProgress] = useState(1)
   const [forwardMsg, setForwardMsg] = useState(null)
   const [reportOpen, setReportOpen] = useState(false)
   const [healthOpen, setHealthOpen] = useState(false)
@@ -77,6 +86,11 @@ export default function ChatThread() {
   const [clearError, setClearError] = useState(null)
 
   const scrollRef = useRef(null)
+  /* Mirrors `atBottom` for the scroll-force effect below. That effect is a
+     `useLayoutEffect` keyed on `messages`, so it can fire before the passive
+     effect that would otherwise keep a plain `atBottom` read in sync for the
+     same commit — a ref sidesteps that ordering gap entirely. */
+  const atBottomRef = useRef(true)
 
   useEffect(() => {
     setReplyTo(null)
@@ -92,7 +106,15 @@ export default function ChatThread() {
     setMoreOpen(false)
     setClearConfirmOpen(false)
     setClearError(null)
+    /* A freshly opened thread always starts pinned to its latest message,
+       regardless of where the previous thread was left scrolled. */
+    setAtBottom(true)
+    atBottomRef.current = true
   }, [chatId])
+
+  useEffect(() => {
+    atBottomRef.current = atBottom
+  }, [atBottom])
 
   /* Escape closes the message action menu, matching the outside-click
      dismissal below rather than requiring a second click on the same bubble. */
@@ -105,21 +127,57 @@ export default function ChatThread() {
     return () => window.removeEventListener('keydown', onKey)
   }, [activeMsg])
 
+  /* Only snaps to the latest message if the user was already there — a new
+     message arriving while someone is scrolled up reading history must not
+     yank them back down. The floating "Latest" pill below (driven by
+     `atBottom`/`onScroll`) is how they get back on purpose instead. */
   useLayoutEffect(() => {
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (el && atBottomRef.current) el.scrollTop = el.scrollHeight
   }, [messages, loading])
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
     setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_SLACK)
+
+    /* How far through the thread you are, for the edge hairline. Guarded
+       against a thread shorter than its viewport, where scrollable height is
+       zero and the ratio would be NaN. */
+    const scrollable = el.scrollHeight - el.clientHeight
+    setProgress(scrollable > 0 ? Math.min(1, Math.max(0, el.scrollTop / scrollable)) : 1)
   }, [])
 
   function jumpToLatest() {
     const el = scrollRef.current
     el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }
+
+  /**
+   * Tapping a quoted reply scrolls to the message it quotes and flashes it.
+   *
+   * The flash is the point: after a scroll the eye has no idea which of the
+   * bubbles now on screen was the target, and "it's the one in the middle" is
+   * only true until the scroll clamps at the top or bottom of the thread.
+   */
+  const flashTimer = useRef(null)
+  function jumpToMessage(messageId) {
+    if (!messageId) return
+    const target = scrollRef.current?.querySelector(`[data-msg="${messageId}"]`)
+    /* Older pages are not loaded until you scroll back for them, so the
+       original may genuinely not be in the DOM. Nothing to do — better than
+       scrolling somewhere arbitrary and flashing the wrong bubble.
+       TODO(milestone 2): page backwards until it is found. */
+    if (!target) return
+
+    target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' })
+    setActiveMsg(null)
+    setFlashId(messageId)
+    clearTimeout(flashTimer.current)
+    flashTimer.current = setTimeout(() => setFlashId(null), 1400)
+  }
+
+  useEffect(() => () => clearTimeout(flashTimer.current), [])
 
   const q = query.trim().toLowerCase()
   const matches = useMemo(
@@ -258,8 +316,14 @@ export default function ChatThread() {
     }
   }
 
+  /* The peer's avatar gradient is a CSS gradient string, not a colour, so the
+     first stop is pulled out of it for the ambient wash. No match (or no
+     gradient at all) leaves the custom property unset and the wash inert. */
+  const threadTint = /#(?:[0-9a-f]{3}|[0-9a-f]{6})\b/i.exec(chat.gradient ?? '')?.[0]
+
   return (
-    <div className="chat-focus">
+    <div className="chat-focus" style={threadTint ? { '--thread-tint': threadTint } : undefined}>
+      <LiveRegion message={announcement} />
       <Header
         leading={
           !isDesktop && (
@@ -382,7 +446,19 @@ export default function ChatThread() {
         }
       >
         <div className="row grow" style={{ gap: 'var(--s3)', minWidth: 0 }}>
-          <Avatar initials={chat.initials} gradient={chat.gradient} size={36} status={chat.online ? 'online' : undefined} />
+          {/* Shared with the avatar in ChatListPane's row via the same
+              layoutId, so opening a chat morphs one into the other instead
+              of cutting between them. Mobile-only: on desktop the list and
+              this header are both on screen at once (split panes), and two
+              simultaneously-mounted elements sharing a layoutId is exactly
+              the case that pattern doesn't support. */}
+          <motion.span
+            layoutId={!isDesktop ? `chat-avatar-${chatId}` : undefined}
+            transition={reduced ? { duration: 0 } : spring}
+            style={{ display: 'inline-flex', flexShrink: 0 }}
+          >
+            <Avatar initials={chat.initials} gradient={chat.gradient} size={36} status={chat.online ? 'online' : undefined} />
+          </motion.span>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className="truncate" style={{ fontWeight: 660, fontSize: 'var(--fs-15)', color: 'var(--text)', letterSpacing: '-0.015em' }}>
               {chat.name}
@@ -461,6 +537,10 @@ export default function ChatThread() {
         )}
       </AnimatePresence>
 
+      {/* Wrapper exists to give the momentum hairline a box matching the
+          scroller exactly — anchoring it to .chat-focus instead would have it
+          run behind the header and composer. */}
+      <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -497,7 +577,8 @@ export default function ChatThread() {
               const grouped = prev && prev.from === m.from && prev.author === m.author && !m.day
               const showAuthor = chat.group && m.from === 'them' && !grouped
               return (
-                <div key={m.id}>
+                /* data-msg is the jump target — see jumpToMessage. */
+                <div key={m.id} data-msg={m.id}>
                   {i === unreadStart && (
                     <>
                       <div className="unread-mark">{chat.unread} new</div>
@@ -533,6 +614,8 @@ export default function ChatThread() {
                     pinned={pinnedId === m.id}
                     match={q ? matches.includes(m.id) : false}
                     dimmed={Boolean(q) && !matches.includes(m.id)}
+                    flash={flashId === m.id}
+                    onJumpTo={jumpToMessage}
                     onStar={toggleStar}
                     onPin={togglePin}
                     onCopy={copy}
@@ -548,6 +631,22 @@ export default function ChatThread() {
         )}
       </div>
 
+      {/* Hidden once you reach the end — at that point it is reporting
+          something you already know, and a full-height bar next to the
+          composer is just noise. */}
+      {!loading && messages.length > 0 && progress < 0.999 && (
+        <motion.span
+          className="thread-momentum"
+          aria-hidden
+          initial={false}
+          animate={{ scaleY: progress, opacity: 0.5 }}
+          transition={reduced ? { duration: 0 } : springSnap}
+        />
+      )}
+
+      {/* Inside the scroller's wrapper, not .chat-focus: `bottom` on the pill
+          was resolving against the whole thread column, which put it on top of
+          the composer instead of just above it. */}
       <AnimatePresence>
         {!atBottom && !loading && messages.length > 0 && (
           <motion.button
@@ -562,6 +661,7 @@ export default function ChatThread() {
           </motion.button>
         )}
       </AnimatePresence>
+      </div>
 
       <AnimatePresence>
         {showCooldown && (
@@ -694,6 +794,7 @@ export default function ChatThread() {
       </AnimatePresence>
 
       <Composer
+        conversationId={chatId}
         onSend={send}
         onTyping={setTyping}
         replyTo={replyTo}

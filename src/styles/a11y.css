@@ -1,0 +1,148 @@
+/* ============================================================
+   UraiQ — Accessibility preferences
+
+   Same mechanism as the themes (see theme-dark.css): redefine tokens under
+   an attribute selector on <html>, touch no component. The difference is
+   that these compose with each other *and* with whichever theme is active —
+   high contrast has to work on the dark theme and the neumorphic one, not
+   just the default — so nothing here assumes a particular --theme.
+
+   Written by lib/a11y.js, which owns the attribute values.
+   ============================================================ */
+
+/* ---------- Text size ---------------------------------------
+   One multiplier drives the whole type scale (see --text-scale in
+   tokens.css). 1.15 and 1.32 rather than round numbers: they land the
+   11px caption — the smallest text in the app, and the one people
+   actually struggle with — on ~12.6px and ~14.5px, which are the sizes
+   worth having. A uniform bump reads more predictably than per-step
+   tuning, and keeps the scale's proportions intact. */
+:root[data-text-size="large"]  { --text-scale: 1.15; }
+:root[data-text-size="larger"] { --text-scale: 1.32; }
+
+/* ---------- Readable typeface -------------------------------
+   Not a claim to ship OpenDyslexic — that needs a licensed font file, and
+   a silent fallback to the default face would be worse than not offering
+   it. What this does is the part the research is clearest about anyway:
+   generous letter, word and line spacing, on a face drawn for screen
+   legibility with unambiguous letterforms. Verdana and Tahoma are chosen
+   because they are near-universally present, so this never falls back to
+   something narrower than what it replaced. */
+:root[data-typeface="readable"] {
+  --font-ui: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif;
+  --font-brand: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif;
+  --text-tracking: 0.02em;
+  --text-word-spacing: 0.09em;
+  --text-leading: 1.62;
+}
+
+/* `body` reads these three tokens directly (see globals.css) — they resolve
+   to the default 0/0/1.45 until this preference changes them. Headings keep
+   their own tight tracking, since negative tracking on a display size is a
+   different problem from cramped body text. */
+:root[data-typeface="readable"] h1,
+:root[data-typeface="readable"] h2,
+:root[data-typeface="readable"] h3,
+:root[data-typeface="readable"] h4 {
+  letter-spacing: 0;
+}
+
+/* ---------- Reduced transparency ----------------------------
+   Frosted chrome is the app's signature, but translucency over moving
+   content is exactly what makes text hard to hold onto for some people.
+   Chrome goes opaque and the backdrop blur is dropped entirely — dropping
+   the blur also removes the GPU cost, which is the other reason people
+   reach for this setting. */
+:root[data-transparency="reduced"] {
+  --chrome-bg: var(--surface-solid);
+  --chrome-blur: none;
+}
+:root[data-transparency="reduced"] .app-bg {
+  opacity: 0.35;
+}
+:root[data-transparency="reduced"] .overlay {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(12, 43, 51, 0.62);
+}
+
+/* ---------- High contrast -----------------------------------
+   The muted text tokens are the real target. --text-4 is the app's
+   secondary text — timestamps, captions, helper copy, empty-state bodies
+   — and at its default value it is the lowest-contrast type in the
+   product. Every step below pulls the greys toward the ink, hardens every
+   border from a hairline wash to a visible line, and drops the decorative
+   background so nothing sits behind text at low contrast. */
+:root[data-contrast="high"] {
+  --text-2: var(--n-900);
+  --text-3: var(--n-800);
+  --text-4: var(--n-700);
+
+  --border: rgba(27, 20, 48, 0.34);
+  --border-strong: rgba(27, 20, 48, 0.52);
+  --divider: rgba(27, 20, 48, 0.30);
+
+  --hover: rgba(27, 20, 48, 0.10);
+  --pressed: rgba(27, 20, 48, 0.16);
+
+  /* A thicker, fully-opaque focus ring — the default 3px wash is tuned to
+     sit quietly, which is the opposite of what this mode is for. */
+  --ring: 0 0 0 3px rgba(88, 28, 135, 0.9);
+}
+
+/* The ambient bubble field is decorative and sits directly behind body text
+   on several screens. It earns its place in the default look; in high
+   contrast it is just noise under type. */
+:root[data-contrast="high"] .app-bg { display: none; }
+
+/* Borders that were deliberately near-invisible in the default look need to
+   become real lines here, not merely darker ones. */
+:root[data-contrast="high"] .card,
+:root[data-contrast="high"] .bento__tile,
+:root[data-contrast="high"] .chip,
+:root[data-contrast="high"] .choice,
+:root[data-contrast="high"] .bubble--in,
+:root[data-contrast="high"] .tabbar,
+:root[data-contrast="high"] .rail,
+:root[data-contrast="high"] .popover,
+:root[data-contrast="high"] .sheet {
+  box-shadow: var(--e2), inset 0 0 0 1.5px var(--border-strong);
+}
+
+/* An underline is the only link affordance that survives a colour-vision
+   difference, so in high contrast it stops being optional. */
+:root[data-contrast="high"] a:not(.iconbtn):not(.btn):not(.rail__item):not(.tabbar__item):not(.row-item) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Dark theme: the same intent, mirrored. Pulling greys *up* toward white
+   rather than down toward ink, and lightening the lines instead of
+   darkening them — a literal copy of the block above would push dark-theme
+   secondary text further into the background, which is backwards. */
+:root[data-theme="dark"][data-contrast="high"] {
+  --border: rgba(255, 255, 255, 0.42);
+  --border-strong: rgba(255, 255, 255, 0.62);
+  --divider: rgba(255, 255, 255, 0.34);
+
+  --hover: rgba(255, 255, 255, 0.14);
+  --pressed: rgba(255, 255, 255, 0.22);
+
+  --ring: 0 0 0 3px rgba(216, 180, 254, 0.95);
+
+  /* Status colours brighten another step — they sit on translucent washes
+     over near-black in this theme, which is the least forgiving pairing in
+     the app. */
+  --success: #6EE7B7;
+  --danger: #FDA4AF;
+  --warning: #FCD34D;
+}
+
+/* Neumorphism defines depth entirely through paired soft shadows and has
+   almost no borders by design, so high contrast has to reintroduce an edge
+   rather than strengthen one that was already there. */
+:root[data-theme="neumorphism"][data-contrast="high"] {
+  --border: rgba(46, 32, 90, 0.40);
+  --border-strong: rgba(46, 32, 90, 0.58);
+  --divider: rgba(46, 32, 90, 0.34);
+}

@@ -1,0 +1,126 @@
+/* ============================================================
+   UraiQ — Dark theme (opt-in, via Settings → Appearance)
+
+   A second skin over the same component tree, same as theme-neumorphism.css:
+   every component already renders through the token layer, so this file is
+   the entire theme — redefine the tokens, touch no component (three
+   exceptions below, where a value was hardcoded outside the token system).
+
+   Unlike neumorphism, this is a structurally normal flat-surface theme —
+   the same visual language as the default light theme, just inverted. Cards
+   sit *lighter* than the page instead of on white, elevation comes from a
+   soft black shadow instead of a light one, and hairline borders become the
+   primary way a card separates from the page since a black-on-black shadow
+   alone reads as nothing.
+
+   The brand gradient is untouched, same reasoning as neumorphism: one
+   consistent violet identity across every skin. It happens to read as
+   "neon" here for free — a saturated violet against near-black doesn't need
+   any extra glow to look luminous.
+   ============================================================ */
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* ---- Neutral ramp, inverted --------------------------------
+     Same violet-biased grayscale as the light theme, walked the other
+     direction: n-0 is now the deepest black, n-900 the brightest white.
+     Everything that reads a specific stop directly (skeleton shimmer, a
+     toggle's off-state track, badge tints) inherits the flip for free. */
+  --n-0:   #050507;
+  --n-25:  #08080D;
+  --n-50:  #0B0B12;
+  --n-100: #111118;
+  --n-150: #15151D;
+  --n-200: #181820;
+  --n-300: #2A2A35;
+  --n-400: #3C3C48;
+  --n-500: #5C5C6B;
+  --n-600: #7C7C8C;
+  --n-700: #A0A0AD;
+  --n-800: #C8C8D2;
+  --n-900: #F5F5F7;
+
+  --text: var(--n-900);
+  --text-2: var(--n-800);
+  --text-3: var(--n-700);
+  --text-4: var(--n-600);
+  --text-on-brand: #FFFFFF;
+
+  /* ---- Surfaces -----------------------------------------------
+     Cards sit lighter than the page — the opposite of the light theme's
+     "white card on grey page" — which is what makes a card read as a
+     raised layer when shadow alone is too subtle against near-black. */
+  --bg: #08080D;
+  --pane: #08080D;
+
+  --surface: #111118;
+  --surface-2: #15151D;
+  --surface-solid: #111118;
+
+  --chrome-bg: rgba(8, 8, 13, 0.82);
+  --chrome-blur: blur(18px) saturate(180%);
+
+  --border: #2A2A35;
+  --border-strong: #3C3C48;
+  --divider: rgba(255, 255, 255, 0.07);
+
+  --track: #181820;
+  --hover: rgba(255, 255, 255, 0.06);
+  --pressed: rgba(255, 255, 255, 0.10);
+
+  /* ---- Elevation ------------------------------------------------
+     A black shadow barely shows against a near-black page, so each step
+     also lifts the top edge with a hairline of light — the same trick real
+     dark-mode systems use to fake a raised edge when shadow alone can't. */
+  --e1: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --e2: 0 6px 16px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --e3: 0 16px 36px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --e4: 0 28px 64px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --e-inset: inset 0 0 0 1px rgba(0, 0, 0, 0.5), inset 0 2px 6px rgba(0, 0, 0, 0.4);
+
+  /* Glow instead of a neutral shadow — this is the one place the theme
+     leans into "neon": the primary action visibly radiates violet light
+     rather than just sitting on a dark shadow like everything else. */
+  --e-brand: 0 0 0 1px rgba(168, 85, 247, 0.25), 0 6px 20px rgba(168, 85, 247, 0.35);
+  --e-brand-lg: 0 0 0 1px rgba(168, 85, 247, 0.32), 0 10px 32px rgba(168, 85, 247, 0.48);
+
+  --ring: 0 0 0 3px rgba(168, 85, 247, 0.45);
+
+  /* ---- Brand ramp: the light-tint stops become dark washes ------
+     brand-50..300 exist to tint a background (a selected row, a soft
+     badge) — on white those are pale lavenders; on near-black the same
+     role is a faint violet wash instead. brand-700/800 exist to be
+     *readable text on top of* that tint, so their lightness has to flip
+     with it: dark violet-on-pale-lavender becomes light violet-on-dark-
+     wash. brand-400/500/600 stay put — already mid-saturation accents,
+     equally at home on white or black. */
+  --brand-50:  rgba(168, 85, 247, 0.08);
+  --brand-100: rgba(168, 85, 247, 0.14);
+  --brand-200: rgba(168, 85, 247, 0.22);
+  --brand-300: rgba(168, 85, 247, 0.34);
+  --brand-700: #C4B5FD;
+  --brand-800: #E9D5FF;
+
+  /* ---- Status ---------------------------------------------------
+     Solid status colors brighten a step for legibility at body-text size
+     on near-black; their tint backgrounds become translucent washes for
+     the same reason the brand tints do. */
+  --success: #34D399;
+  --success-bg: rgba(16, 185, 129, 0.14);
+  --danger: #FB7185;
+  --danger-bg: rgba(225, 29, 72, 0.16);
+  --warning: #FBBF24;
+  --warning-bg: rgba(217, 119, 6, 0.16);
+  --online: #22C55E;
+
+}
+
+/* One value is hardcoded outside the token system entirely, so redefining
+   tokens alone can't reach it — scoped here, same idea as the exceptions in
+   theme-neumorphism.css. The toggle knob's shadow assumes a light page (a
+   soft dark shadow under a white circle); deepened so it still reads as a
+   shadow rather than vanishing against a page that's already near-black. */
+:root[data-theme="dark"] .toggle__knob {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}

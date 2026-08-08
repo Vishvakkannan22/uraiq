@@ -15,7 +15,7 @@ function CommunityRow({ c }) {
         <div className="row" style={{ gap: 'var(--s3)', marginTop: 2, fontSize: 'var(--fs-12)', color: 'var(--text-4)' }}>
           <span className="row tnum" style={{ gap: 4 }}><Users size={12} />{c.members}</span>
           <span className="row tnum" style={{ gap: 4 }}><Hash size={12} />{c.channels}</span>
-          <span className="pill" style={{ height: 18, fontSize: 10 }}>{c.tag}</span>
+          <span className="pill" style={{ height: 18, fontSize: 'var(--fs-11)' }}>{c.tag}</span>
         </div>
       </div>
       {c.unread > 0 && <span className="badge" style={{ flexShrink: 0 }}>{c.unread}</span>}
